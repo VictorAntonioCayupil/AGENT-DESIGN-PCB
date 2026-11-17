@@ -60,7 +60,7 @@ AGENT-DESIGN-PCB/
 
 1. Clone este repositorio en su equipo:
    ```bash
-   git clone https://github.com/vcayul/AGENT-DESIGN-PCB.git
+   git clone https://github.com/VictorAntonioCayupil/AGENT-DESIGN-PCB.git
    ```
 2. Copie la carpeta `skills/designing-pcb-normative` al directorio de skills de su entorno:
    * **Antigravity / Gemini:** `~/.gemini/config/skills/designing-pcb-normative`
