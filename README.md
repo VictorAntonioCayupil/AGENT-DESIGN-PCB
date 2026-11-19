@@ -41,6 +41,7 @@
 | **Manual 08 — Microcontroladores y Antenas RF** | Pines trampa de arranque en **ESP32/S3/C3** (`ADC2`, `EN`), **STM32** (`BOOT0`, `VDDA`, SWD), **RP2040** y **AVR** (`AREF`), zonas *Keep-Out* sin cobre para antenas y red de adaptación en $\pi$. | [08-microcontroladores-rf-pinout-seguro.md](skills/designing-pcb-normative/references/08-microcontroladores-rf-pinout-seguro.md) |
 | **Manual 09 — Simulación, DFT y *Bring-Up*** | Simulación SPICE en EasyEDA Pro, puntos de prueba (`TP`) obligatorios, puentes de aislamiento de $0\,\Omega$ y protocolo de encendido seguro en laboratorio. | [09-simulacion-dft-bringup-laboratorio.md](skills/designing-pcb-normative/references/09-simulacion-dft-bringup-laboratorio.md) |
 | **Manual 10 — Arquitectura Multi-Agente** | Orquestación de 4 roles especialistas (Arquitecto de Circuito/MCU, Gestor de Compras, Ingeniero de Layout/EMC y Auditor DFM/Laboratorio). | [10-arquitectura-multiagente-pcb.md](skills/designing-pcb-normative/references/10-arquitectura-multiagente-pcb.md) |
+| **Manual 11 — Guía Operativa Oficial del Editor EasyEDA** | Reglas oficiales del lienzo EasyEDA (eje $Y$ invertido, errores de *Convert to PCB*, correspondencia Pin/Pad `1,2` vs `A,C`, regiones `No Solid` y `Board Cutout`, reconstrucción de cobre `Shift+B` y anatomía de archivos Gerber `.GKO`/`.DRL`). | [11-guia-operativa-editor-easyeda.md](skills/designing-pcb-normative/references/11-guia-operativa-editor-easyeda.md) |
 | **Plantilla 1 — Ficha Técnica Viva** | Documento persistente de arquitectura, árbol de potencia, *pinout*, *stackup* y estado de avance del proyecto. | [HARDWARE-SPEC.template.md](skills/designing-pcb-normative/templates/HARDWARE-SPEC.template.md) |
 | **Plantilla 2 — Matriz de Compras y Proveedores** | Comparativa de componentes entre LCSC (`Basic/Extended`), AliExpress y Alibaba con evaluación de rating, envío, MOQ y riesgo de falsificación. | [BOM-SOURCING.template.md](skills/designing-pcb-normative/templates/BOM-SOURCING.template.md) |
 | **Plantilla 3 — Checklist de *Bring-Up* en Banco** | Registro paso a paso de pruebas en frío ($\Omega$), primer encendido con fuente limitada, medición de rieles y validación de periféricos. | [BRINGUP-CHECKLIST.template.md](skills/designing-pcb-normative/templates/BRINGUP-CHECKLIST.template.md) |
@@ -73,7 +74,8 @@ AGENT-DESIGN-PCB/
             ├── 07-proteccion-integral-circuitos.md
             ├── 08-microcontroladores-rf-pinout-seguro.md
             ├── 09-simulacion-dft-bringup-laboratorio.md
-            └── 10-arquitectura-multiagente-pcb.md
+            ├── 10-arquitectura-multiagente-pcb.md
+            └── 11-guia-operativa-editor-easyeda.md
 ```
 
 ---

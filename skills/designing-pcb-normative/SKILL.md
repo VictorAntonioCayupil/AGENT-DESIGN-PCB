@@ -60,7 +60,7 @@ digraph pcb_normative_v3_flow {
 4. **Implemente los Bloques Prácticos:** USB-C ($2\times 5.1\,\text{k}\Omega$ independientes en `CC1`/`CC2`), LDO vs. Buck ($P_{\text{loss}} > 0.5\,\text{W} \rightarrow$ Buck con *Hot Loop* mínimo), *Power Path* de batería, *Pull-Ups* I2C, RS-485 (`120 Ω` + `SM712`), relés/MOSFETs (diodo *Flyback* + $R_g$ + $R_{gs}$) y filtros ADC antialiasing.
 
 ### Fase 2: Esquemático Normativo, PDN, Terminaciones, ESD, DFT y Simulación
-1. **Lea obligatoriamente:** [references/01-esquematico-pdn-esd.md](references/01-esquematico-pdn-esd.md) y [references/09-simulacion-dft-bringup-laboratorio.md](references/09-simulacion-dft-bringup-laboratorio.md) (Secciones 1 y 2).
+1. **Lea obligatoriamente:** [references/01-esquematico-pdn-esd.md](references/01-esquematico-pdn-esd.md), [references/09-simulacion-dft-bringup-laboratorio.md](references/09-simulacion-dft-bringup-laboratorio.md) (Secciones 1 y 2) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md) (Secciones 1 y 2: eje $Y$ positivo hacia abajo, banderas *No Connect*, prefijos de subpartes `U1.1` y coincidencia de pines/pads `1,2` vs `A,C`).
 2. **Calcule y agregue al esquemático:**
    * **Impedancia objetivo PDN:** $Z_{\text{target}} = \frac{\Delta V_{\text{allowed}}}{\Delta I_{\text{transient}}}$ y desacoplo en **3 décadas** ($10\,\mu\text{F} + 100\,\text{nF} + 10\,\text{nF}$) respetando $f_{\text{SRF}}$ y colocando $< 2\,\text{mm}$ de cada pin $V_{DD}$.
    * **Terminación serie:** $R_s = Z_{\text{trace}} - Z_{\text{source}}$ en el pin transmisor de relojes/SPI rápidos ($\Gamma = 0$).
@@ -80,7 +80,7 @@ digraph pcb_normative_v3_flow {
    * **Laminado base (IPC-4101):** Especifique **`IPC-4101/126`** ($T_g \ge 150\text{–}170\,^\circ\text{C}$, $T_d \ge 340\,^\circ\text{C}$) para reflujo sin plomo SAC305 o **`IPC-4101/129`** libre de halógenos.
 
 ### Fase 4: Planos GND Continuos, Integridad de Señal (SI), Antenas RF y Ruteo
-1. **Lea obligatoriamente:** [references/03-integridad-senal-gnd-ruteo.md](references/03-integridad-senal-gnd-ruteo.md) y [references/08-microcontroladores-rf-pinout-seguro.md](references/08-microcontroladores-rf-pinout-seguro.md) (Sección 3).
+1. **Lea obligatoriamente:** [references/03-integridad-senal-gnd-ruteo.md](references/03-integridad-senal-gnd-ruteo.md), [references/08-microcontroladores-rf-pinout-seguro.md](references/08-microcontroladores-rf-pinout-seguro.md) (Sección 3) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md) (Sección 3: contorno `BoardOutline` cerrado, regiones `No Solid` para Keep-Out, `Board Cutout` para ranuras `.GKO`, `Keep Island = No` y reconstrucción obligatoria de cobre con `easyeda_pcb_rebuild_copper` / `Shift+B`).
 2. **Aplique en el PCB:**
    * **Continuidad absoluta de GND:** Plano GND sólido debajo de toda señal rápida. **Prohibido cruzar cortes de plano (*split planes*)**. Vías de retorno a GND junto a cada vía de cambio de capa y vías dobles en capacitores de desacoplo.
    * **Zona *Keep-Out* de Antenas RF:** Cero cobre, cero planos GND y cero pistas en **todas las capas** debajo y a $15\,\text{mm}$ a los lados de antenas PCB (ESP32/BLE/LoRa), o antena asomando fuera del borde + red de adaptación en $\pi$.
