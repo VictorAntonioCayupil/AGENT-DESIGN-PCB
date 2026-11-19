@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "1980-01-01T00:00:00.000Z",
+  "package": "easyeda-bridge-extension.eext",
+  "packageSize": 232013,
+  "packageSha256": "231dcff358e41375e24c320db75f5f4dd5ebabb78ee3fcf0c6d1838c643692b0",
+  "files": [
+    {
+      "path": "dist/dispatcher.js",
+      "size": 313113,
+      "sha256": "2d194407fbdf5a2408a09c121432219e9b5d0556b05d7a5fc2dfb48818ba50e4"
+    },
+    {
+      "path": "dist/dispatcher.meta.json",
+      "size": 180,
+      "sha256": "dd297ffe5aac3a7d71de51778ad50c97f2bd48c85182ac7714a71f4ca23a636b"
+    },
+    {
+      "path": "dist/index.js",
+      "size": 378608,
+      "sha256": "20fba2da79801f38e99d7f0c22453c2dc381c47db5ac0230f0372e6bd46446c8"
+    },
+    {
+      "path": "extension.json",
+      "size": 4124,
+      "sha256": "b4e939d48e3aac74ac6842f3aa28332d23ebb11480d6876d4706f1333558935c"
+    },
+    {
+      "path": "images/logo.png",
+      "size": 76882,
+      "sha256": "f7a9ac7395bcd0b1704a8cdc31c44f83d4b2fd230d75a21273d31c513235c52b"
+    }
+  ]
+}

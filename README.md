@@ -99,15 +99,26 @@ AGENT-DESIGN-PCB/
             ├── 08-microcontroladores-rf-pinout-seguro.md
             ├── 09-simulacion-dft-bringup-laboratorio.md
             ├── 10-arquitectura-multiagente-pcb.md
-            └── 11-guia-operativa-editor-easyeda.md
+            ├── 11-guia-operativa-editor-easyeda.md
+            └── 12-servidor-mcp-normativo-agente.md
+├── easyeda-extension/                                  # Extensión empaquetada para EasyEDA Pro
+│   ├── README.md                                       # Guía de instalación en 1 minuto con capturas
+│   ├── easyeda-bridge-extension.eext                   # Paquete oficial .eext para importar en EasyEDA Pro
+│   └── easyeda-bridge-extension.checksums.json         # Checksums SHA-256 de verificación
 ```
 
 ---
 
 ## 4. Instalación Paso a Paso
 
-> [!IMPORTANT]
-> Antes de iniciar, instale **Node.js (v18 o superior)** y abra **EasyEDA Pro** con su puente local activo si desea que el agente opere sobre sus diseños en tiempo real.
+### Paso 0: Instalar la Extensión en EasyEDA Pro (Paquete `.eext`)
+
+1. Abra **EasyEDA Pro** (v3.2.x Desktop).
+2. Vaya al menú superior: **`Avanzado` $\rightarrow$ `Gestor de Extensiones...`** (*Advanced $\rightarrow$ Extensions Manager...*).
+3. Haga clic en **`Importar Extensión`** (*Import Extension*) y seleccione el archivo [`easyeda-extension/easyeda-bridge-extension.eext`](easyeda-extension/easyeda-bridge-extension.eext).
+4. Asegúrese de activar la casilla **`Permitir Interacción Externa`** (*Allow External Interaction*).
+5. **Cierre completamente EasyEDA Pro y vuelva a abrirlo.**
+6. En la barra de menú verá el nuevo menú **`MCP Bridge`** $\rightarrow$ haga clic en **`Connect`**.
 
 ### Paso 1: Instalar la Skill en su Agente de IA
 
