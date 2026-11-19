@@ -1,24 +1,25 @@
-# AGENT-DESIGN-PCB (v3.0) — Ingeniero Electrónico Integral, Co-Piloto de PCB y Gestor Multi-Agente de Hardware
+# AGENT-DESIGN-PCB (v4.0) — Ingeniero Electrónico Integral, Servidor MCP Normativo y Co-Piloto de Hardware
 
 > **Una iniciativa de S&D MMCALL para la comunidad.**  
-> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, basándose en conceptos reales de la física electrónica, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), co-diseño seguro con microcontroladores (**ESP32**, **STM32**, **RP2040**, **AVR**) y gestión inteligente de proveedores (**EasyEDA Pro / LCSC / JLCPCB**, **AliExpress** y **Alibaba**).
+> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, basándose en conceptos reales de la física electrónica, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), co-diseño seguro con microcontroladores (**ESP32**, **STM32**, **RP2040**, **AVR**), un **servidor MCP nativo con 7 motores de cálculo determinista** y gestión inteligente de proveedores (**EasyEDA Pro / LCSC / JLCPCB**, **AliExpress** y **Alibaba**).
 
-[![Versión: 3.0](https://img.shields.io/badge/Versión-3.0%20Full%20Electronic%20Engineer%20%2B%20Multi--Agent-brightgreen.svg)](#1-qué-hace-este-proyecto)
+[![Versión: 4.0](https://img.shields.io/badge/Versión-4.0%20Full%20Electronic%20Engineer%20%2B%20Native%20MCP-brightgreen.svg)](#1-qué-hace-este-proyecto)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-blue.svg)](LICENSE)
 [![Norma de Redacción: ISO 24495-1](https://img.shields.io/badge/Documentación-ISO%2024495--1%20%7C%20ISO%2FIEC%2082079--1-success.svg)](#3-estructura-del-repositorio)
-[![Conector MCP: easyeda-mcp-pro](https://img.shields.io/badge/MCP-easyeda--mcp--pro-orange.svg)](https://github.com/oaslananka/easyeda-mcp-pro)
+[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.0)-blueviolet.svg)](mcp-server/)
+[![Conector CAD: easyeda-mcp-pro](https://img.shields.io/badge/CAD%20Bridge-easyeda--mcp--pro-orange.svg)](https://github.com/oaslananka/easyeda-mcp-pro)
 
 ---
 
 ## 1. ¿Qué hace este proyecto?
 
-**AGENT-DESIGN-PCB v3.0** convierte a tu agente de Inteligencia Artificial (o equipo de sub-agentes en Antigravity, Claude Code, Cursor, Gemini CLI o Codex) en un **Ingeniero Electrónico Senior de Armado de PCB** que te acompaña de principio a fin:
+**AGENT-DESIGN-PCB v4.0** convierte a tu agente de Inteligencia Artificial (o equipo de sub-agentes en Antigravity, Claude Code, Cursor, Gemini CLI o Codex) en un **Ingeniero Electrónico Senior de Armado de PCB** respaldado por un servidor MCP nativo con motores de cálculo matemático y auditoría física:
 
-1. **Entiende qué quieres y cómo lo quieres (Fase 0):** Antes de trazar un cable, realiza una entrevista inteligente (o inspecciona tu avance actual en EasyEDA Pro) para saber cómo se alimentará la placa, si la soldarás a mano en laboratorio (**IPC-7351 Nivel A**, paquetes `0805`/`SOIC`) o en fábrica PCBA (**Nivel B**, paquetes `0402`/`QFN`) y dónde comprarás las piezas.
-2. **Conserva la memoria viva del proyecto en 3 documentos:** Mantiene actualizados `HARDWARE-SPEC.md` (arquitectura y cálculos), `BOM-SOURCING.md` (auditoría de compras) y `BRINGUP-CHECKLIST.md` (protocolo de encendido en laboratorio).
-3. **Domina Microcontroladores (Co-Diseño HW/FW) y Antenas RF:** Evita pines trampa de arranque (*Strapping Pins* en **ESP32/S3/C3**, bloqueo de `ADC2` con Wi-Fi, polarización de `BOOT0`/`VDDA` en **STM32**, resistencias USB en **RP2040** y protección de `AREF` en **AVR**), e impone zonas libres de cobre (*Keep-Out*) y redes $\pi$ en antenas Wi-Fi/BLE/LoRa.
-4. **Blinda y Protege tus Circuitos contra Fallas Reales:** Diseña protecciones contra inversión de polaridad (MOSFET canal P como diodo ideal + Zener de compuerta), sobrecorriente (fusibles PPTC con *thermal derating* y *eFuses*), transitorios pesados (**IEC 61000-4-2 ESD**, **IEC 61000-4-4 EFT** e **IEC 61000-4-5 Surge** con coordinación MOV + TVS), filtros EMI ($\pi$ y modo común) y aislamiento galvánico.
-5. **Aplica todas las normas IPC e IEC con rigor matemático:** Calcula impedancia objetivo de PDN ($Z_{\text{target}}$), desacoplo en 3 décadas ($f_{\text{SRF}}$), anchos de pista (**IPC-2221 / IPC-2152**), vías térmicas ($R_{\text{th}}$), *Clearance* y *Creepage* por tensión pico (**IPC-2221C / IEC 60664-1** + ranuras fresadas $>1\,\text{mm}$), planos **GND continuos**, impedancia $Z_0$ (**IPC-2141A**) y reglas $3W / 5W$.
+1. **Servidor MCP Nativo Determinista (`agent-design-pcb-mcp`):** Expone 7 herramientas estándar JSON-RPC 2.0 sobre `stdio` para calcular anchos de pista (**IPC-2221 / IPC-2152**), *Clearance/Creepage* con detección de ranuras fresadas (**IPC-2221C / IEC 60664-1**), impedancia y diafonía (**IPC-2141A** y reglas $3W/5W$), desacoplo de PDN en 3 décadas ($Z_{\text{target}}$ y $f_{\text{SRF}}$), matrices de vías térmicas (conducción de Fourier y relación de aspecto), validación de *pinout* de MCU (evita conflictos de strapping pins y `ADC2` con Wi-Fi) y auditoría 2D de *courtyards* y chaflanes de placa.
+2. **Entiende qué quieres y cómo lo quieres (Fase 0):** Antes de trazar un cable, realiza una entrevista inteligente (o inspecciona tu avance actual en EasyEDA Pro) para saber cómo se alimentará la placa, si la soldarás a mano en laboratorio (**IPC-7351 Nivel A**, paquetes `0805`/`SOIC`) o en fábrica PCBA (**Nivel B**, paquetes `0402`/`QFN`) y dónde comprarás las piezas.
+3. **Conserva la memoria viva del proyecto en 3 documentos:** Mantiene actualizados `HARDWARE-SPEC.md` (arquitectura y cálculos), `BOM-SOURCING.md` (auditoría de compras) y `BRINGUP-CHECKLIST.md` (protocolo de encendido en laboratorio).
+4. **Domina Microcontroladores (Co-Diseño HW/FW) y Antenas RF:** Evita pines trampa de arranque (*Strapping Pins* en **ESP32/S3/C3/C6**, bloqueo de `ADC2` con Wi-Fi, polarización de `BOOT0`/`VDDA` en **STM32**, resistencias USB en **RP2040** y protección de `AREF` en **AVR**), e impone zonas libres de cobre (*Keep-Out*) y redes $\pi$ en antenas Wi-Fi/BLE/LoRa.
+5. **Blinda y Protege tus Circuitos contra Fallas Reales:** Diseña protecciones contra inversión de polaridad (MOSFET canal P como diodo ideal + Zener de compuerta), sobrecorriente (fusibles PPTC con *thermal derating* y *eFuses*), transitorios pesados (**IEC 61000-4-2 ESD**, **IEC 61000-4-4 EFT** e **IEC 61000-4-5 Surge** con coordinación MOV + TVS), filtros EMI ($\pi$ y modo común) y aislamiento galvánico.
 6. **Gestiona y Audita tus Compras en LCSC, AliExpress y Alibaba:**
    * **EasyEDA Pro / LCSC / JLCPCB:** Verifica stock real, valida huellas y prioriza **Basic Parts** para eliminar recargos de montaje.
    * **AliExpress y Alibaba:** Busca componentes, audita reputación ($\ge 95\%$, $\ge 4.7\star$, *Verified Supplier*, *Trade Assurance*), calcula costo con envío, detecta chips falsificados/remarcados ($<40\%$ del valor oficial) y valida medidas físicas antes de cerrar el *footprint*.
@@ -38,10 +39,11 @@
 | **Manual 05 — Bloques Electrónicos Prácticos** | Topologías listas para usar: USB-C UFP ($2\times 5.1\,\text{k}\Omega$), reguladores LDO vs. Buck (*Hot Loop*), baterías LiPo (*Power Path*), I2C, RS-485 industrial, relés/MOSFETs y filtros ADC. | [05-bloques-electronicos-practicos.md](skills/designing-pcb-normative/references/05-bloques-electronicos-practicos.md) |
 | **Manual 06 — Co-Piloto EasyEDA y Gestor de Compras** | Transacciones seguras con *rollback* en EasyEDA Pro, optimización PCBA (**LCSC / JLCPCB**) y protocolo de auditoría de proveedores en **AliExpress y Alibaba**. | [06-copiloto-easyeda-sourcing-global.md](skills/designing-pcb-normative/references/06-copiloto-easyeda-sourcing-global.md) |
 | **Manual 07 — Protección Integral de Circuitos** | Inversión de polaridad (MOSFET ideal + Zener), sobrecorriente (PPTC con *derating* y eFuse), coordinación Surge (**IEC 61000-4-5** MOV+TVS), filtros EMI ($\pi$/modo común) y aislamiento galvánico. | [07-proteccion-integral-circuitos.md](skills/designing-pcb-normative/references/07-proteccion-integral-circuitos.md) |
-| **Manual 08 — Microcontroladores y Antenas RF** | Pines trampa de arranque en **ESP32/S3/C3** (`ADC2`, `EN`), **STM32** (`BOOT0`, `VDDA`, SWD), **RP2040** y **AVR** (`AREF`), zonas *Keep-Out* sin cobre para antenas y red de adaptación en $\pi$. | [08-microcontroladores-rf-pinout-seguro.md](skills/designing-pcb-normative/references/08-microcontroladores-rf-pinout-seguro.md) |
+| **Manual 08 — Microcontroladores y Antenas RF** | Pines trampa de arranque en **ESP32/S3/C3/C6** (`ADC2`, `EN`), **STM32** (`BOOT0`, `VDDA`, SWD), **RP2040** y **AVR** (`AREF`), zonas *Keep-Out* sin cobre para antenas y red de adaptación en $\pi$. | [08-microcontroladores-rf-pinout-seguro.md](skills/designing-pcb-normative/references/08-microcontroladores-rf-pinout-seguro.md) |
 | **Manual 09 — Simulación, DFT y *Bring-Up*** | Simulación SPICE en EasyEDA Pro, puntos de prueba (`TP`) obligatorios, puentes de aislamiento de $0\,\Omega$ y protocolo de encendido seguro en laboratorio. | [09-simulacion-dft-bringup-laboratorio.md](skills/designing-pcb-normative/references/09-simulacion-dft-bringup-laboratorio.md) |
 | **Manual 10 — Arquitectura Multi-Agente** | Orquestación de 4 roles especialistas (Arquitecto de Circuito/MCU, Gestor de Compras, Ingeniero de Layout/EMC y Auditor DFM/Laboratorio). | [10-arquitectura-multiagente-pcb.md](skills/designing-pcb-normative/references/10-arquitectura-multiagente-pcb.md) |
 | **Manual 11 — Guía Operativa Oficial del Editor EasyEDA** | Reglas oficiales del lienzo EasyEDA (eje $Y$ invertido, errores de *Convert to PCB*, correspondencia Pin/Pad `1,2` vs `A,C`, regiones `No Solid` y `Board Cutout`, reconstrucción de cobre `Shift+B` y anatomía de archivos Gerber `.GKO`/`.DRL`). | [11-guia-operativa-editor-easyeda.md](skills/designing-pcb-normative/references/11-guia-operativa-editor-easyeda.md) |
+| **Manual 12 — Servidor MCP Normativo del Agente** | Especificación técnica de las 7 herramientas MCP del agente (`pcb_normative_*`), protocolo de resolución atómica de DRC en EasyEDA Pro y configuración de entorno. | [12-servidor-mcp-normativo-agente.md](skills/designing-pcb-normative/references/12-servidor-mcp-normativo-agente.md) |
 | **Plantilla 1 — Ficha Técnica Viva** | Documento persistente de arquitectura, árbol de potencia, *pinout*, *stackup* y estado de avance del proyecto. | [HARDWARE-SPEC.template.md](skills/designing-pcb-normative/templates/HARDWARE-SPEC.template.md) |
 | **Plantilla 2 — Matriz de Compras y Proveedores** | Comparativa de componentes entre LCSC (`Basic/Extended`), AliExpress y Alibaba con evaluación de rating, envío, MOQ y riesgo de falsificación. | [BOM-SOURCING.template.md](skills/designing-pcb-normative/templates/BOM-SOURCING.template.md) |
 | **Plantilla 3 — Checklist de *Bring-Up* en Banco** | Registro paso a paso de pruebas en frío ($\Omega$), primer encendido con fuente limitada, medición de rieles y validación de periféricos. | [BRINGUP-CHECKLIST.template.md](skills/designing-pcb-normative/templates/BRINGUP-CHECKLIST.template.md) |
@@ -55,9 +57,31 @@ AGENT-DESIGN-PCB/
 ├── README.md                                           # Manual principal de instalación y uso (ISO/IEC 82079-1)
 ├── LICENSE                                             # Licencia MIT (S&D MMCALL)
 ├── NOTICE.md                                           # Reconocimiento legal a easyeda-mcp-pro y normas técnicas
-├── mcp-config.example.json                             # Configuración lista para el servidor MCP de EasyEDA Pro
+├── mcp-config.example.json                             # Configuración lista para los servidores MCP
+├── mcp-server/                                         # Servidor MCP Normativo Desarrollado por S&D MMCALL
+│   ├── agent_design_pcb_mcp.py                         # Servidor stdio JSON-RPC 2.0 con 7 herramientas IPC/IEC
+│   └── test_mcp_and_easyeda_live.py                    # Suite de pruebas automatizadas y diagnóstico de placa
 └── skills/
-    └── designing-pcb-normative/
+    └── designing-pcb-normative/                        # Skill para el agente de IA
+        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.0)
+        ├── templates/                                  # Plantillas Markdown normalizadas
+        │   ├── HARDWARE-SPEC.template.md
+        │   ├── BOM-SOURCING.template.md
+        │   └── BRINGUP-CHECKLIST.template.md
+        └── references/                                 # 13 Manuales técnicos normativos (00 a 12)
+            ├── 00-entrevista-y-contexto-proyecto.md
+            ├── 01-esquematico-pdn-esd.md
+            ├── 02-termica-aislamiento-materiales.md
+            ├── 03-integridad-senal-gnd-ruteo.md
+            ├── 04-dfm-ensamblaje-easyeda-mcp.md
+            ├── 05-bloques-electronicos-practicos.md
+            ├── 06-copiloto-easyeda-sourcing-global.md
+            ├── 07-proteccion-integral-circuitos.md
+            ├── 08-microcontroladores-rf-pinout-seguro.md
+            ├── 09-simulacion-dft-bringup-laboratorio.md
+            ├── 10-arquitectura-multiagente-pcb.md
+            ├── 11-guia-operativa-editor-easyeda.md
+            └── 12-servidor-mcp-normativo-agente.md
         ├── SKILL.md                                    # Contrato operativo v3.0 del Agente PCB (Fase 0 a Fase 5)
         ├── templates/
         │   ├── HARDWARE-SPEC.template.md               # Plantilla de memoria viva del proyecto electrónico
@@ -96,16 +120,24 @@ AGENT-DESIGN-PCB/
    * **Claude Code:** `~/.claude/skills/designing-pcb-normative`
    * **Multi-agente estándar:** `~/.agents/skills/designing-pcb-normative`
 
-### Paso 2: Conectar el Servidor MCP de EasyEDA Pro
+### Paso 2: Conectar los Servidores MCP
 
 1. Abra el archivo de configuración MCP de su agente (por ejemplo, `mcp_config.json`).
 2. Agregue el bloque incluido en [mcp-config.example.json](mcp-config.example.json):
    ```json
    {
      "mcpServers": {
-       "easyeda-mcp-pro": {
-         "command": "npx",
+       "agent-design-pcb": {
+         "command": "python",
          "args": [
+           "c:/Users/vcayu/Documents/SKILL/DESIGN-PCB/mcp-server/agent_design_pcb_mcp.py"
+         ]
+       },
+       "easyeda-mcp-pro": {
+         "command": "cmd",
+         "args": [
+           "/c",
+           "npx",
            "-y",
            "easyeda-mcp-pro@1.15.6"
          ],
@@ -118,7 +150,15 @@ AGENT-DESIGN-PCB/
      }
    }
    ```
-   *(En Windows, si su entorno requiere invocar `cmd`, utilice `"command": "cmd"` con `"args": ["/c", "npx", "-y", "easyeda-mcp-pro@1.15.6"]`).*
+
+### Paso 3: Ejecutar la Suite de Pruebas Automatizadas
+
+Para validar que todas las calculadoras normativas IPC/IEC y el protocolo JSON-RPC estén 100 % operativos en su entorno:
+
+```bash
+cd mcp-server
+python test_mcp_and_easyeda_live.py
+```
 
 ---
 

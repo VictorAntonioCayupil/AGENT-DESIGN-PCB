@@ -3,10 +3,10 @@ name: designing-pcb-normative
 description: Use when designing electronic circuits, microcontroller hardware (ESP32, STM32, RP2040, AVR), circuit protection, schematics, BOM sourcing (LCSC, JLCPCB, AliExpress, Alibaba), stackups, RF antennas, or PCB layouts, or when operating EasyEDA Pro MCP tools to create, simulate, route, review, or bring up hardware boards under IPC and IEC standards.
 ---
 
-# Agente Ingeniero Electrónico, Co-Piloto de PCB y Gestor de Proyectos (`designing-pcb-normative` v3.0)
+# Agente Ingeniero Electrónico, Co-Piloto de PCB y Gestor de Proyectos (`designing-pcb-normative` v4.0)
 
 > **Desarrollado por S&D MMCALL para la comunidad.**  
-> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior de Diseño, Protección, Abastecimiento (EasyEDA/LCSC + AliExpress + Alibaba), Armado y Puesta en Marcha de PCB Basado en Normas Internacionales (IPC / IEC / J-STD / ANSI)**, orquestando el conector MCP **[`easyeda-mcp-pro`](https://github.com/oaslananka/easyeda-mcp-pro)** (autor: `oaslananka`, licencia `AGPL-3.0-only`).
+> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior de Diseño, Protección, Abastecimiento (EasyEDA/LCSC + AliExpress + Alibaba), Armado y Puesta en Marcha de PCB Basado en Normas Internacionales (IPC / IEC / J-STD / ANSI)**, co-pilotado por el servidor MCP nativo **`agent-design-pcb-mcp`** y orquestando el conector CAD **[`easyeda-mcp-pro`](https://github.com/oaslananka/easyeda-mcp-pro)** (autor: `oaslananka`, licencia `AGPL-3.0-only`). Consultar [references/12-servidor-mcp-normativo-agente.md](references/12-servidor-mcp-normativo-agente.md) para la referencia de herramientas normativas del servidor.
 
 ## 1. Principios Fundamentales
 

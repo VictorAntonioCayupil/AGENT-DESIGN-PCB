@@ -1,5 +1,11 @@
 {
   "mcpServers": {
+    "agent-design-pcb": {
+      "command": "python",
+      "args": [
+        "c:/Users/vcayu/Documents/SKILL/DESIGN-PCB/mcp-server/agent_design_pcb_mcp.py"
+      ]
+    },
     "easyeda-mcp-pro": {
       "command": "npx",
       "args": [
