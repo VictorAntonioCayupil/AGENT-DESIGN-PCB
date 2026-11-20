@@ -25,25 +25,38 @@ No haga preguntas que usted mismo pueda responder inspeccionando el entorno. Si 
 
 ---
 
-## 3. Paso 2: Las 4 Preguntas Clave de Descubrimiento (Entrevista Guiada)
+## 3. Paso 2: Indagación de Prototipo Físico, Fotos y Entorno de Operación
+
+Antes de formular preguntas técnicas abstractas, el agente debe preguntar si el usuario ya cuenta con un montaje preliminar:
+
+> **Pregunta Clave de Partida:**  
+> *"¿Tienes ya este circuito armado en un protoboard físico, un boceto en papel o fotos del montaje?*  
+> * *Si ya lo armaste:* Sube las fotos o lista de conexiones para que analice visualmente los pines, módulos y cables puente (*jumpers*). Generaré un **Protoboard Virtual Interactivo** para confirmar que entendí exactamente tu circuito.  
+> * *Si partes de una idea:* Construiremos juntos el Protoboard Virtual paso a paso, buscando los componentes adecuados y probando el cableado antes de pasar al PCB."*
+
+### Paso 2.1: Las 5 Preguntas Clave de Descubrimiento (Entrevista Guiada)
 
 Si el proyecto comienza desde cero o faltan definiciones críticas, formule únicamente las preguntas necesarias (máximo 1 o 2 por turno, en lenguaje claro y ofreciendo opciones recomendadas):
 
-### A. Propósito Funcional y Entorno
-* **Qué averiguar:** ¿Qué sensores, actuadores o comunicaciones necesita la placa y en qué ambiente trabajará (interior limpio, exterior húmedo, industrial con ruido eléctrico)?
-* **Impacto normativo:** Define la Clase **IPC-6012** (Clase 2 vs. Clase 3), el Grado de Polución (**IEC 60664-1**) y el nivel de protección ESD (**IEC 61000-4-2**).
+### A. Ubicación, Gabinete y Entorno de Operación (Registrar en `ENVIRONMENT-CONDITIONS.md`)
+* **Qué averiguar:** ¿Dónde operará el circuito (interior oficina, exterior intemperie, vehículo con vibración, riel DIN industrial)? ¿Estará expuesto a humedad, condensación, polvo o calor extremo?
+* **Impacto normativo:** Define la necesidad de caja estanca **IP65/IP67**, tropicalizado con barniz (*Conformal Coating* **IPC-CC-830**), conectores con seguro de retención mecánica (**IEC 60068-2-6**) y supresores de transitorios vehiculares (**ISO 7637-2 / ISO 16750-2**). Consultar [Manual 13](13-del-protoboard-fisico-y-virtual-al-pcb.md).
 
-### B. Fuente de Energía y Niveles de Tensión/Corriente
-* **Qué averiguar:** ¿Cómo se alimentará el circuito (USB 5 V, batería LiPo/18650, fuente industrial 12 V / 24 V o red eléctrica 110 V / 220 V AC)? ¿Cuál es la carga de mayor consumo?
-* **Impacto normativo:** Define la arquitectura de reguladores (LDO vs. Buck), el cálculo de ancho de pistas (**IPC-2221 / IPC-2152**) y las distancias de aislamiento por tensión pico (**IPC-2221C**).
+### B. Propósito Funcional y Cables Externos
+* **Qué averiguar:** ¿Qué sensores, actuadores o comunicaciones necesita la placa? ¿Los sensores van en la placa o tienen cables de más de $1\,\text{metro}$?
+* **Impacto normativo:** Define la Clase **IPC-6012** (Clase 2 vs. Clase 3), y exige diodos supresores TVS dedicados (**IEC 61000-4-2**) en borneras con cables largos.
 
-### C. Método de Armado y Nivel de Experiencia en Soldadura
+### C. Fuente de Energía y Niveles de Tensión/Corriente
+* **Qué averiguar:** ¿Cómo se alimentará el circuito (batería LiPo/18650, USB 5 V, fuente industrial 12 V / 24 V o red eléctrica 110 V / 220 V AC)? ¿Cuál es la carga de mayor consumo?
+* **Impacto normativo:** En baterías exige etapas de *Deep Sleep* ($I_Q < 20\,\mu\text{A}$) y corte UVLO; define reguladores (LDO vs. Buck), anchos de pista (**IPC-2221 / IPC-2152**) y distancias de aislamiento por tensión pico (**IPC-2221C**).
+
+### D. Método de Armado y Nivel de Experiencia en Soldadura
 * **Qué averiguar:** ¿Soldará la placa usted mismo a mano en su banco de trabajo (cautín / aire caliente) o pedirá el servicio de ensamblaje automático en fábrica (PCBA)?
 * **Impacto normativo directo en EasyEDA Pro:**
   * **Si suelda a mano en laboratorio:** Seleccione **IPC-7351B Nivel A** (pads extendidos) y encapsulados amigables como `0805` o `0603` para pasivos, y `SOIC`, `TSSOP` o módulos con pines castellados en lugar de BGA/QFN diminutos.
   * **Si pide ensamblaje robotizado (PCBA):** Seleccione **IPC-7351B Nivel B** y encapsulados compactos (`0402`, `0603`, `QFN`) priorizando el catálogo de *Basic Parts* del fabricante.
 
-### D. Estrategia de Compra de Componentes (*Sourcing*)
+### E. Estrategia de Compra de Componentes (*Sourcing*)
 * **Qué averiguar:** ¿Desea comprar todos los componentes directamente al proveedor integrado de EasyEDA Pro (**LCSC / JLCPCB**), comprarlos por su cuenta en **AliExpress / Alibaba**, o usar una **estrategia híbrida**?
 * **Impacto en el flujo:** Activa el Gestor de Compras ([Manual 06](06-copiloto-easyeda-sourcing-global.md)) para auditar stock en LCSC y/o buscar vendedores confiables en AliExpress y Alibaba antes de fijar las huellas (*footprints*) en la placa.
 

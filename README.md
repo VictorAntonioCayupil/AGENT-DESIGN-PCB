@@ -44,9 +44,12 @@
 | **Manual 10 — Arquitectura Multi-Agente** | Orquestación de 4 roles especialistas (Arquitecto de Circuito/MCU, Gestor de Compras, Ingeniero de Layout/EMC y Auditor DFM/Laboratorio). | [10-arquitectura-multiagente-pcb.md](skills/designing-pcb-normative/references/10-arquitectura-multiagente-pcb.md) |
 | **Manual 11 — Guía Operativa Oficial del Editor EasyEDA** | Reglas oficiales del lienzo EasyEDA (eje $Y$ invertido, errores de *Convert to PCB*, correspondencia Pin/Pad `1,2` vs `A,C`, regiones `No Solid` y `Board Cutout`, reconstrucción de cobre `Shift+B` y anatomía de archivos Gerber `.GKO`/`.DRL`). | [11-guia-operativa-editor-easyeda.md](skills/designing-pcb-normative/references/11-guia-operativa-editor-easyeda.md) |
 | **Manual 12 — Servidor MCP Normativo del Agente** | Especificación técnica de las 7 herramientas MCP del agente (`pcb_normative_*`), protocolo de resolución atómica de DRC en EasyEDA Pro y configuración de entorno. | [12-servidor-mcp-normativo-agente.md](skills/designing-pcb-normative/references/12-servidor-mcp-normativo-agente.md) |
+| **Manual 13 — Del Protoboard al PCB Profesional** | Metodología de co-diseño: análisis visual de fotos/armado físico, simulador de Protoboard Virtual interactivo, auditoría de entorno (IP65, vibración, cables largos) y salto normativo al PCB. | [13-del-protoboard-fisico-y-virtual-al-pcb.md](skills/designing-pcb-normative/references/13-del-protoboard-fisico-y-virtual-al-pcb.md) |
 | **Plantilla 1 — Ficha Técnica Viva** | Documento persistente de arquitectura, árbol de potencia, *pinout*, *stackup* y estado de avance del proyecto. | [HARDWARE-SPEC.template.md](skills/designing-pcb-normative/templates/HARDWARE-SPEC.template.md) |
 | **Plantilla 2 — Matriz de Compras y Proveedores** | Comparativa de componentes entre LCSC (`Basic/Extended`), AliExpress y Alibaba con evaluación de rating, envío, MOQ y riesgo de falsificación. | [BOM-SOURCING.template.md](skills/designing-pcb-normative/templates/BOM-SOURCING.template.md) |
 | **Plantilla 3 — Checklist de *Bring-Up* en Banco** | Registro paso a paso de pruebas en frío ($\Omega$), primer encendido con fuente limitada, medición de rieles y validación de periféricos. | [BRINGUP-CHECKLIST.template.md](skills/designing-pcb-normative/templates/BRINGUP-CHECKLIST.template.md) |
+| **Plantilla 4 — Contexto y Condiciones de Entorno** | Registro normativo de ubicación (IP rating), rango térmico, vibración (**IEC 60068-2-6**), transitorios vehiculares (**ISO 7637**) y cables largos. | [ENVIRONMENT-CONDITIONS.template.md](skills/designing-pcb-normative/templates/ENVIRONMENT-CONDITIONS.template.md) |
+| **Plantilla 5 — Protoboard Virtual Interactivo** | Simulador y visualizador interactivo en HTML5/Tailwind para montar componentes, simular conexiones y auditar reglas antes de rutear el PCB. | [VIRTUAL-BREADBOARD.template.html](skills/designing-pcb-normative/templates/VIRTUAL-BREADBOARD.template.html) |
 
 ---
 
@@ -58,17 +61,23 @@ AGENT-DESIGN-PCB/
 ├── LICENSE                                             # Licencia MIT (S&D MMCALL)
 ├── NOTICE.md                                           # Reconocimiento legal a easyeda-mcp-pro y normas técnicas
 ├── mcp-config.example.json                             # Configuración lista para los servidores MCP
+├── easyeda-extension/                                  # Extensión empaquetada para EasyEDA Pro
+│   ├── README.md                                       # Guía de instalación en 1 minuto con capturas
+│   ├── easyeda-bridge-extension.eext                   # Paquete oficial .eext para importar en EasyEDA Pro
+│   └── easyeda-bridge-extension.checksums.json         # Checksums SHA-256 de verificación
 ├── mcp-server/                                         # Servidor MCP Normativo Desarrollado por S&D MMCALL
 │   ├── agent_design_pcb_mcp.py                         # Servidor stdio JSON-RPC 2.0 con 7 herramientas IPC/IEC
 │   └── test_mcp_and_easyeda_live.py                    # Suite de pruebas automatizadas y diagnóstico de placa
 └── skills/
     └── designing-pcb-normative/                        # Skill para el agente de IA
-        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.0)
+        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.1)
         ├── templates/                                  # Plantillas Markdown normalizadas
-        │   ├── HARDWARE-SPEC.template.md
-        │   ├── BOM-SOURCING.template.md
-        │   └── BRINGUP-CHECKLIST.template.md
-        └── references/                                 # 13 Manuales técnicos normativos (00 a 12)
+        │   ├── HARDWARE-SPEC.template.md               # Memoria viva del hardware
+        │   ├── BOM-SOURCING.template.md                # Matriz de compras (LCSC / AliExpress / Alibaba)
+        │   ├── BRINGUP-CHECKLIST.template.md           # Puesta en marcha en banco de pruebas
+        │   ├── ENVIRONMENT-CONDITIONS.template.md      # Contexto y condiciones de entorno (IP, temperatura, cables)
+        │   └── VIRTUAL-BREADBOARD.template.html        # Simulador de Protoboard Virtual interactivo (HTML5)
+        └── references/                                 # 14 Manuales técnicos normativos (00 a 13)
             ├── 00-entrevista-y-contexto-proyecto.md
             ├── 01-esquematico-pdn-esd.md
             ├── 02-termica-aislamiento-materiales.md
@@ -81,30 +90,8 @@ AGENT-DESIGN-PCB/
             ├── 09-simulacion-dft-bringup-laboratorio.md
             ├── 10-arquitectura-multiagente-pcb.md
             ├── 11-guia-operativa-editor-easyeda.md
-            └── 12-servidor-mcp-normativo-agente.md
-        ├── SKILL.md                                    # Contrato operativo v3.0 del Agente PCB (Fase 0 a Fase 5)
-        ├── templates/
-        │   ├── HARDWARE-SPEC.template.md               # Plantilla de memoria viva del proyecto electrónico
-        │   ├── BOM-SOURCING.template.md                # Plantilla de auditoría de compras (LCSC / AliExpress / Alibaba)
-        │   └── BRINGUP-CHECKLIST.template.md           # Plantilla de pruebas y puesta en marcha en laboratorio
-        └── references/
-            ├── 00-entrevista-y-contexto-proyecto.md
-            ├── 01-esquematico-pdn-esd.md
-            ├── 02-termica-aislamiento-materiales.md
-            ├── 03-integridad-senal-gnd-ruteo.md
-            ├── 04-dfm-ensamblaje-easyeda-mcp.md
-            ├── 05-bloques-electronicos-practicos.md
-            ├── 06-copiloto-easyeda-sourcing-global.md
-            ├── 07-proteccion-integral-circuitos.md
-            ├── 08-microcontroladores-rf-pinout-seguro.md
-            ├── 09-simulacion-dft-bringup-laboratorio.md
-            ├── 10-arquitectura-multiagente-pcb.md
-            ├── 11-guia-operativa-editor-easyeda.md
-            └── 12-servidor-mcp-normativo-agente.md
-├── easyeda-extension/                                  # Extensión empaquetada para EasyEDA Pro
-│   ├── README.md                                       # Guía de instalación en 1 minuto con capturas
-│   ├── easyeda-bridge-extension.eext                   # Paquete oficial .eext para importar en EasyEDA Pro
-│   └── easyeda-bridge-extension.checksums.json         # Checksums SHA-256 de verificación
+            ├── 12-servidor-mcp-normativo-agente.md
+            └── 13-del-protoboard-fisico-y-virtual-al-pcb.md
 ```
 
 ---

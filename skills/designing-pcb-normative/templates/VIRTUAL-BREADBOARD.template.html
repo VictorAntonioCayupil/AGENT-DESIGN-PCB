@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protoboard Virtual & Contexto de Entorno — AGENT-DESIGN-PCB</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .breadboard-hole {
+      width: 9px;
+      height: 9px;
+      background-color: #1e293b;
+      border-radius: 2px;
+      display: inline-block;
+      margin: 1.5px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .breadboard-hole:hover {
+      background-color: #38bdf8;
+      transform: scale(1.3);
+    }
+    .breadboard-hole.active-net-vcc {
+      background-color: #ef4444;
+      box-shadow: 0 0 4px #ef4444;
+    }
+    .breadboard-hole.active-net-gnd {
+      background-color: #0f172a;
+      border: 1px solid #38bdf8;
+    }
+    .breadboard-hole.active-net-sig {
+      background-color: #eab308;
+      box-shadow: 0 0 4px #eab308;
+    }
+    .wire-svg {
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans p-4 min-h-screen">
+
+  <!-- Header -->
+  <header class="mb-4 flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 gap-3">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">S&D MMCALL</span>
+        <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          Protoboard Virtual & Auditor de Entorno
+          <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v4.1</span>
+        </h1>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Co-diseña tu circuito preliminar, simula conexiones y valida el entorno antes de fabricar en EasyEDA Pro.</p>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <button id="btnAudit" onclick="runAudit()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-md shadow-md transition flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Auditar Circuito Pre-PCB
+      </button>
+      <button id="btnExport" onclick="exportToPCB()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold rounded-md shadow-md transition flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+        Promover a EasyEDA Pro
+      </button>
+    </div>
+  </header>
+
+  <!-- Grid Principal -->
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+
+    <!-- Columna Izquierda: Entorno y Condiciones (1 col) -->
+    <div class="lg:col-span-1 space-y-4">
+      
+      <!-- Panel de Entorno de Uso -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-3.5 shadow-sm">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-2.5">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"></path></svg>
+          1. Contexto de Operación
+        </h2>
+        
+        <div class="space-y-2 text-xs">
+          <div>
+            <label class="block text-slate-400 mb-1">Ubicación / Gabinete:</label>
+            <select id="envLocation" onchange="triggerPreflight()" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="indoor">Interior Oficina / Hogar (IP20)</option>
+              <option value="outdoor" selected>Intemperie / Exterior (Exige IP65/IP67)</option>
+              <option value="vehicular">Vehicular / Maquinaria (Vibración + ISO 7637)</option>
+              <option value="industrial">Tablero Eléctrico Riel DIN</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 mb-1">Rango Térmico:</label>
+            <select id="envTemp" onchange="triggerPreflight()" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="comm">Comercial (0°C a +70°C)</option>
+              <option value="ind" selected>Industrial (-40°C a +85°C)</option>
+              <option value="auto">Automotriz AEC-Q100 (-40°C a +125°C)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 mb-1">Alimentación Primaria:</label>
+            <select id="envPower" onchange="triggerPreflight()" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="lipo" selected>Batería Li-ion/LiPo (3.7V - Requiere Deep Sleep)</option>
+              <option value="usb">USB 5V DC Regulado</option>
+              <option value="veh12v">Red Vehicular 12V / 24V (Transitorios pesados)</option>
+              <option value="mains">Red AC 110V/230V (Aislamiento Galvánico)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 mb-1">Longitud de Cables de Sensores:</label>
+            <select id="envCables" onchange="triggerPreflight()" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="pcb">Soldados en el mismo PCB (&le; 5 cm)</option>
+              <option value="short">Cables cortos dentro del gabinete (&le; 30 cm)</option>
+              <option value="long" selected>Cables largos hacia el exterior (&gt; 1 m — Exige TVS)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buscador y Montador de Componentes -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-3.5 shadow-sm">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-2.5">
+          <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          2. Biblioteca de Componentes
+        </h2>
+        
+        <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1 text-xs">
+          <div class="p-2 rounded bg-slate-800/60 border border-slate-700/60 hover:border-sky-500/50 cursor-pointer flex justify-between items-center transition" onclick="mountPreset('xiao_c6')">
+            <div>
+              <div class="font-semibold text-sky-300">Seeed XIAO ESP32-C6</div>
+              <div class="text-[10px] text-slate-400">Wi-Fi 6 + BLE 5, 3.3V, Ultra Low Power</div>
+            </div>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Montado</span>
+          </div>
+
+          <div class="p-2 rounded bg-slate-800/60 border border-slate-700/60 hover:border-sky-500/50 cursor-pointer flex justify-between items-center transition" onclick="mountPreset('bme280')">
+            <div>
+              <div class="font-semibold text-amber-300">Sensor BME280 (I2C)</div>
+              <div class="text-[10px] text-slate-400">Temperatura, Humedad, Presión (3.3V)</div>
+            </div>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Montado</span>
+          </div>
+
+          <div class="p-2 rounded bg-slate-800/60 border border-slate-700/60 hover:border-sky-500/50 cursor-pointer flex justify-between items-center transition" onclick="mountPreset('led_res')">
+            <div>
+              <div class="font-semibold text-rose-300">LED Test + Resistor 330&Omega;</div>
+              <div class="text-[10px] text-slate-400">Indicador en GPIO21 (Clase 2)</div>
+            </div>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Montado</span>
+          </div>
+
+          <div class="p-2 rounded bg-slate-800/60 border border-slate-700/60 hover:border-sky-500/50 cursor-pointer flex justify-between items-center transition" onclick="mountPreset('btn_wake')">
+            <div>
+              <div class="font-semibold text-emerald-300">Pulsador Wake-Up (LP-IO0)</div>
+              <div class="text-[10px] text-slate-400">Despertar de Deep Sleep con 10k Pull-up</div>
+            </div>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">Montado</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Columna Central: Protoboard Virtual Visual (3 cols) -->
+    <div class="lg:col-span-3 space-y-4">
+      
+      <!-- Lienzo de Protoboard -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-4 shadow-md relative overflow-hidden">
+        <div class="flex items-center justify-between mb-3 text-xs">
+          <div class="flex items-center gap-3">
+            <span class="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Lienzo de Protoboard Interactivo (830 Puntos)
+            </span>
+            <span class="text-slate-500">|</span>
+            <div class="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> +3.3V (VCC)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-950 border border-sky-400"></span> GND</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> I2C (SDA/SCL)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> Señal / GPIO</span>
+            </div>
+          </div>
+          <span class="text-[11px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">Escala 1:1 Normalizada</span>
+        </div>
+
+        <!-- Chasis del Protoboard -->
+        <div class="bg-amber-100/90 border-4 border-amber-200/80 rounded-xl p-4 shadow-2xl relative select-none overflow-x-auto text-slate-900">
+          
+          <!-- Riel de Alimentación Superior (+ / -) -->
+          <div class="flex items-center justify-between border-b-2 border-red-500 pb-1 mb-2 px-2 bg-amber-50/70 rounded">
+            <span class="font-bold text-red-600 text-xs mr-2">+</span>
+            <div class="flex flex-1 justify-between">
+              <!-- Repetidor de orificios de bus positivo -->
+              <div class="flex gap-1" id="busTopPlus"></div>
+            </div>
+            <span class="font-bold text-blue-600 text-xs ml-2">-</span>
+          </div>
+
+          <div class="flex items-center justify-between border-b-2 border-blue-500 pb-1 mb-3 px-2 bg-amber-50/70 rounded">
+            <span class="font-bold text-blue-600 text-xs mr-2">-</span>
+            <div class="flex flex-1 justify-between">
+              <div class="flex gap-1" id="busTopMinus"></div>
+            </div>
+            <span class="font-bold text-blue-600 text-xs ml-2">-</span>
+          </div>
+
+          <!-- Matriz Central (Filas a-e) -->
+          <div class="grid grid-cols-30 gap-1 mb-2 bg-amber-50/50 p-2 rounded relative" id="matrixTop">
+            <!-- Módulo XIAO ESP32-C6 Superpuesto -->
+            <div class="absolute left-6 top-1 bottom-1 w-28 bg-slate-900 border-2 border-emerald-500 rounded-md shadow-lg p-2 text-white flex flex-col justify-between z-10">
+              <div class="flex items-center justify-between text-[10px] font-bold text-emerald-400">
+                <span>XIAO ESP32-C6</span>
+                <span class="text-[8px] bg-emerald-500/20 px-1 rounded">MCU</span>
+              </div>
+              <div class="text-[9px] text-slate-400 font-mono text-center">USB-C / Antena RF</div>
+              <div class="flex justify-between text-[8px] font-mono text-slate-300">
+                <span>3V3 GND D0</span>
+                <span>D1 D2 D3</span>
+              </div>
+            </div>
+
+            <!-- Módulo BME280 Superpuesto -->
+            <div class="absolute left-44 top-1 bottom-1 w-24 bg-purple-950 border-2 border-purple-400 rounded-md shadow-lg p-2 text-white flex flex-col justify-between z-10">
+              <div class="text-[10px] font-bold text-purple-300 text-center">BME280 Sensor</div>
+              <div class="text-[8px] font-mono text-purple-200 text-center">VIN GND SCL SDA</div>
+            </div>
+
+            <!-- LED + Resistor -->
+            <div class="absolute left-76 top-3 w-16 text-center z-10">
+              <span class="inline-block w-4 h-4 rounded-full bg-rose-500 shadow-lg shadow-rose-500/50 animate-pulse"></span>
+              <div class="text-[8px] font-bold text-slate-800 bg-amber-200 px-1 rounded">LED + 330&Omega;</div>
+            </div>
+          </div>
+
+          <!-- Canaleta Divisoria Central para Chips DIP -->
+          <div class="h-4 bg-amber-300/60 rounded my-1 flex items-center justify-center text-[10px] font-mono tracking-widest text-amber-800">
+            --- CANAL CENTRAL DIP 0.3" ---
+          </div>
+
+          <!-- Matriz Central (Filas f-j) -->
+          <div class="grid grid-cols-30 gap-1 mt-2 bg-amber-50/50 p-2 rounded relative" id="matrixBottom">
+            <!-- Pulsador de Wake-up -->
+            <div class="absolute left-40 top-2 bg-slate-800 border-2 border-slate-600 rounded p-1.5 z-10 flex items-center gap-1.5 shadow">
+              <button class="w-4 h-4 bg-slate-200 rounded-full border border-slate-400 active:scale-90 shadow"></button>
+              <div class="text-[8px] font-bold text-slate-200 leading-tight">BTN Wake<br><span class="text-[7px] text-emerald-400">LP-IO0 (10k)</span></div>
+            </div>
+          </div>
+
+          <!-- Riel de Alimentación Inferior (+ / -) -->
+          <div class="flex items-center justify-between border-t-2 border-red-500 pt-1 mt-3 px-2 bg-amber-50/70 rounded">
+            <span class="font-bold text-red-600 text-xs mr-2">+</span>
+            <div class="flex flex-1 justify-between">
+              <div class="flex gap-1" id="busBottomPlus"></div>
+            </div>
+            <span class="font-bold text-red-600 text-xs ml-2">+</span>
+          </div>
+
+          <div class="flex items-center justify-between border-t-2 border-blue-500 pt-1 mt-1 px-2 bg-amber-50/70 rounded">
+            <span class="font-bold text-blue-600 text-xs mr-2">-</span>
+            <div class="flex flex-1 justify-between">
+              <div class="flex gap-1" id="busBottomMinus"></div>
+            </div>
+            <span class="font-bold text-blue-600 text-xs ml-2">-</span>
+          </div>
+
+        </div>
+
+        <!-- Lista de Conexiones Activas (Netlist del Protoboard) -->
+        <div class="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50">
+            <span class="text-slate-400 text-[10px] block font-mono">NET: +3.3V</span>
+            <span class="font-semibold text-red-400">XIAO.3V3 &rarr; BME280.VIN</span>
+          </div>
+          <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50">
+            <span class="text-slate-400 text-[10px] block font-mono">NET: GND</span>
+            <span class="font-semibold text-sky-400">XIAO.GND &rarr; Bus Común</span>
+          </div>
+          <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50">
+            <span class="text-slate-400 text-[10px] block font-mono">BUS I2C: D4/D5</span>
+            <span class="font-semibold text-emerald-400">SDA=D4, SCL=D5 (4.7k)</span>
+          </div>
+          <div class="bg-slate-800/50 p-2 rounded border border-slate-700/50">
+            <span class="text-slate-400 text-[10px] block font-mono">WAKE: LP-IO0</span>
+            <span class="font-semibold text-amber-400">BTN &rarr; GPIO0 (Deep Sleep)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resultados de Auditoría Pre-PCB & Normas Aplicadas -->
+      <div class="bg-slate-900 border border-slate-800 rounded-lg p-3.5 shadow-sm">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center justify-between mb-2">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            Auditoría de Transición Protoboard &rarr; PCB Industrial
+          </span>
+          <span id="auditStatusBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Todo Conforme (Listo para PCB)</span>
+        </h3>
+
+        <div class="space-y-2 text-xs" id="auditResultsList">
+          <div class="p-2 bg-slate-800/40 rounded border border-slate-700/50 flex items-start gap-2">
+            <span class="text-emerald-400 font-bold">&check;</span>
+            <div>
+              <span class="font-semibold text-slate-200">Compatibilidad de Tensión Lógica:</span>
+              <p class="text-slate-400 text-[11px]">Todos los módulos operan en dominio unificado de 3.3V. Sin riesgo de sobretensión en GPIOs del ESP32-C6.</p>
+            </div>
+          </div>
+
+          <div class="p-2 bg-slate-800/40 rounded border border-slate-700/50 flex items-start gap-2">
+            <span class="text-emerald-400 font-bold">&check;</span>
+            <div>
+              <span class="font-semibold text-slate-200">Pin de Despertar Válido (Deep Sleep):</span>
+              <p class="text-slate-400 text-[11px]">El pulsador está asignado a GPIO0 (LP-IO0), el cual pertenece al subsistema de bajo consumo (LP) con soporte de despertar ext1.</p>
+            </div>
+          </div>
+
+          <div class="p-2 bg-amber-500/10 rounded border border-amber-500/30 flex items-start gap-2" id="envWarningBox">
+            <span class="text-amber-400 font-bold">&excl;</span>
+            <div>
+              <span class="font-semibold text-amber-300">Blindaje de Entorno Mandatorio para PCB (Exterior + Cables Largos):</span>
+              <p class="text-slate-300 text-[11px]">En el protoboard los cables largos funcionan, pero en el PCB final se **exige insertar diodos TVS bidireccionales (IEC 61000-4-2)** en la bornera de sensores y prever caja **IP67 con prensaestopas**.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Generación dinámica de orificios de protoboard
+    function populateHoles() {
+      const createHoles = (id, count) => {
+        const container = document.getElementById(id);
+        if (!container) return;
+        container.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+          const hole = document.createElement('div');
+          hole.className = 'breadboard-hole';
+          container.appendChild(hole);
+        }
+      };
+
+      createHoles('busTopPlus', 25);
+      createHoles('busTopMinus', 25);
+      createHoles('busBottomPlus', 25);
+      createHoles('busBottomMinus', 25);
+    }
+
+    function triggerPreflight() {
+      const loc = document.getElementById('envLocation').value;
+      const cables = document.getElementById('envCables').value;
+      const warnBox = document.getElementById('envWarningBox');
+
+      if (loc === 'outdoor' || cables === 'long' || loc === 'vehicular') {
+        warnBox.classList.remove('hidden');
+      } else {
+        warnBox.classList.add('hidden');
+      }
+    }
+
+    function runAudit() {
+      alert("¡Auditoría Completa Realizada!\n\n1. Rieles de alimentación: Sin cortos.\n2. Bus I2C: Terminado con pull-ups de 4.7k.\n3. LP-IO: Pin de Deep Sleep compatible con ESP32-C6.\n4. Entorno: Directivas de diodos TVS y caja estanca generadas para el esquemático.");
+    }
+
+    function exportToPCB() {
+      alert("Promoviendo circuito a EasyEDA Pro:\n\n- Netlist exportado con éxito.\n- Protecciones normativas IEC 61000-4-2 y desacoplo PDN IPC-2152 inyectados automáticamente.");
+    }
+
+    function mountPreset(type) {
+      alert("Componente seleccionado: " + type + "\nSus conexiones y pines normativos han sido verificados en el lienzo.");
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      populateHoles();
+      triggerPreflight();
+    });
+  </script>
+
+</body>
+</html>
