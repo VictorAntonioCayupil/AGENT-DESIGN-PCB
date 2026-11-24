@@ -23,6 +23,15 @@ COPPER_OZ_TO_MM = 0.035
 COPPER_RHO_20C = 1.724e-8        # Ohm * m
 COPPER_TCR = 0.00393             # 1 / °C
 COPPER_K_THERMAL = 385.0         # W / (m * K)
+MAX_RPC_LINE_BYTES = 1_048_576   # 1 MiB CWE-400 protection
+MAX_COLLECTION_ITEMS = 2000      # Bound O(N^2) loops
+
+
+def _require_pos_finite(val: float, name: str) -> float:
+    fval = float(val)
+    if not math.isfinite(fval) or fval <= 0.0:
+        raise ValueError(f"El parámetro '{name}' debe ser un número finito mayor que 0.")
+    return fval
 
 
 # ============================================================================
@@ -230,6 +239,11 @@ def calc_impedance_si(
         copper_oz = float(preset["copper_oz"])
         stackup_applied = {"name": jlcpcb_stackup, **preset}
 
+    _require_pos_finite(trace_width_mm, "trace_width_mm")
+    _require_pos_finite(dielectric_h_mm, "dielectric_h_mm")
+    _require_pos_finite(copper_oz, "copper_oz")
+    _require_pos_finite(er, "er")
+
     t_mm = copper_oz * COPPER_OZ_TO_MM
     w_over_h = trace_width_mm / dielectric_h_mm
     model_valid = w_over_h <= 7.5
@@ -309,6 +323,9 @@ def calc_pdn_decoupling(
     esl_nh = esl_nh_by_pkg.get(package, 0.80)
     esl_h = esl_nh * 1e-9
 
+    _require_pos_finite(voltage_nominal_v, "voltage_nominal_v")
+    _require_pos_finite(ripple_percent, "ripple_percent")
+    _require_pos_finite(transient_current_a, "transient_current_a")
     dv_allowed = voltage_nominal_v * (ripple_percent / 100.0)
     z_target = dv_allowed / transient_current_a
 
@@ -353,6 +370,11 @@ def calc_thermal_vias(
     Calcula la resistencia térmica de conducción de Fourier (R_th = L / (k * A))
     de una matriz de N vías térmicas en paralelo.
     """
+    _require_pos_finite(board_thickness_mm, "board_thickness_mm")
+    _require_pos_finite(via_drill_mm, "via_drill_mm")
+    _require_pos_finite(plating_thickness_um, "plating_thickness_um")
+    if power_dissipation_w < 0 or not math.isfinite(power_dissipation_w):
+        raise ValueError("power_dissipation_w debe ser finito y >= 0.")
     l_m = board_thickness_mm * 1e-3
     r_outer_m = (via_drill_mm * 1e-3) / 2.0
     t_plating_m = plating_thickness_um * 1e-6
@@ -428,6 +450,26 @@ def validate_mcu_pinout(
                         f"{p} ({func}): En ESP32-C6 solo GPIO0..GPIO7 son LP-IO capaces de despertar al chip desde Deep Sleep (ext1)."
                     )
 
+        if "C5" in fam:
+            c5_adc_pins = {"GPIO1", "GPIO2", "GPIO3", "GPIO4", "GPIO5", "GPIO6", "D0"}
+            c5_strapping = {"GPIO2", "GPIO3", "GPIO7", "GPIO25", "GPIO26", "GPIO27", "GPIO28", "D2", "D3", "MTMS", "MTDI"}
+            jtag_pads = {"MTMS", "MTDI", "MTCK", "MTDO"}
+            for p, func in pin_assignments.items():
+                pu = p.upper()
+                fu = func.upper()
+                if "ADC" in fu and pu not in c5_adc_pins:
+                    blocking_errors.append(
+                        f"{p} ({func}): En XIAO ESP32-C5 / ESP32-C5 solo D0 (GPIO1 = ADC1_CH0) en el borde o GPIO1..GPIO6 poseen ADC1. D2 es GPIO25 (NO tiene ADC y es Strapping Pin)."
+                    )
+                if pu in jtag_pads and ("WAKE" in fu or "SLEEP" in fu or "RTC" in fu or "I2C" in fu):
+                    blocking_errors.append(
+                        f"{p} ({func}): En XIAO ESP32-C5 Seeed Studio prohíbe usar los pads JTAG inferiores (MTMS=GPIO2/Strapping, MTDI=GPIO3/Strapping, MTCK, MTDO) para Deep-Sleep Wake o buses periféricos; use D4 (GPIO23 SDA) y D5 (GPIO24 SCL)."
+                    )
+                elif pu in c5_strapping:
+                    warnings.append(
+                        f"Strapping Pin {pu} en ESP32-C5 asignado a '{func}': asegure que no fuerce niveles inválidos durante el reset."
+                    )
+
         recommendations.append("Incluya red RC de retardo en pin EN/CHIP_PU (10 kΩ a 3V3 + 1 uF a GND) y fuente 3.3V >= 600 mA.")
 
     elif "STM32" in fam:
@@ -475,6 +517,11 @@ def audit_floorplan_2d(
     Verifica colisiones 2D entre componentes, violaciones del contorno (incluyendo chaflanes)
     y genera la lista de coordenadas en mils nativos lista para easyeda_pcb_place_batch.
     """
+    _require_pos_finite(board_width_mm, "board_width_mm")
+    _require_pos_finite(board_height_mm, "board_height_mm")
+    if len(components) > MAX_COLLECTION_ITEMS:
+        raise ValueError(f"components excede el límite de seguridad ({MAX_COLLECTION_ITEMS}).")
+
     def inside_octagon(x: float, y: float) -> bool:
         if not (0.0 <= x <= board_width_mm and 0.0 <= y <= board_height_mm):
             return False
@@ -1274,8 +1321,16 @@ def handle_tool_call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def run_stdio_server() -> None:
-    """Bucle principal MCP JSON-RPC 2.0 sobre stdio."""
+    """Bucle principal MCP JSON-RPC 2.0 sobre stdio con protecciones CWE-400 y JSON estricto."""
     for raw_line in sys.stdin:
+        if len(raw_line) > MAX_RPC_LINE_BYTES:
+            sys.stdout.write(json.dumps({
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32600, "message": "Payload JSON-RPC excede el límite máximo de 1 MiB."},
+            }) + "\n")
+            sys.stdout.flush()
+            continue
         line = raw_line.strip()
         if not line:
             continue
@@ -1297,11 +1352,11 @@ def run_stdio_server() -> None:
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "agent-design-pcb-mcp",
-                        "version": "4.4.0",
+                        "version": "4.5.0",
                     },
                 },
             }
-            sys.stdout.write(json.dumps(resp) + "\n")
+            sys.stdout.write(json.dumps(resp, allow_nan=False) + "\n")
             sys.stdout.flush()
         elif method == "notifications/initialized":
             continue
@@ -1311,7 +1366,7 @@ def run_stdio_server() -> None:
                 "id": req_id,
                 "result": {"tools": TOOLS_SCHEMA},
             }
-            sys.stdout.write(json.dumps(resp) + "\n")
+            sys.stdout.write(json.dumps(resp, allow_nan=False) + "\n")
             sys.stdout.flush()
         elif method == "tools/call":
             t_name = params.get("name", "")
@@ -1322,7 +1377,7 @@ def run_stdio_server() -> None:
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": {
-                        "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}],
+                        "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2, allow_nan=False)}],
                         "structuredContent": out,
                         "isError": False,
                     },
@@ -1336,7 +1391,7 @@ def run_stdio_server() -> None:
                         "isError": True,
                     },
                 }
-            sys.stdout.write(json.dumps(resp) + "\n")
+            sys.stdout.write(json.dumps(resp, allow_nan=False) + "\n")
             sys.stdout.flush()
         elif req_id is not None:
             resp = {

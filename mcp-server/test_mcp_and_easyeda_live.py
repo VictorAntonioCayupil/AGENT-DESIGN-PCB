@@ -175,6 +175,18 @@ def test_normative_calculators() -> None:
     assert q_urgent["summary"]["channel_distribution"]["MERCADO_LOCAL"] == 3
     print(f"  [OK] Cotizador Multicanal (Urgencia <=3d): 100% redirigido a MERCADO_LOCAL (${q_urgent['summary']['optimal_hybrid_total_usd']} USD en 24-48h con factura).")
 
+    # 1.10 Validación XIAO-ESP32-C5 (detecta D2 sin ADC y JTAG prohibidos) + Endurecimiento Seguridad CWE-20/369
+    c5_bad = mcp.validate_mcu_pinout("XIAO-ESP32-C5", {"D2": "VBAT_ADC", "MTMS": "RTC_WAKE"})
+    assert c5_bad["passed"] is False and len(c5_bad["blocking_errors"]) == 2
+    c5_good = mcp.validate_mcu_pinout("XIAO-ESP32-C5", {"D0": "VBAT_ADC", "D1": "SENSOR_WAKE", "D4": "RTC_SDA", "D5": "RTC_SCL"})
+    assert c5_good["passed"] is True
+    try:
+        mcp.calc_impedance_si(trace_width_mm=0.0, dielectric_h_mm=0.2)
+        raise AssertionError("Debió rechazar trace_width_mm <= 0")
+    except ValueError:
+        pass
+    print("  [OK] XIAO-ESP32-C5 Validator + Endurecimiento CWE-20/369 verificados.")
+
 
 def test_stdio_jsonrpc_protocol() -> None:
     print("\n=== 2. Probando Protocolo MCP JSON-RPC 2.0 sobre STDIO ===")

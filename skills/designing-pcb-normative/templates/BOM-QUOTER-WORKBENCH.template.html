@@ -226,10 +226,19 @@
       },
     ];
 
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function fmtCell(evalObj) {
-      if (!evalObj) return `<span class="text-slate-600">N/A</span>`;
+      if (!evalObj) return '<span class="text-slate-600">N/A</span>';
       const cls = evalObj.eligible ? "text-slate-200" : "text-rose-400/70 line-through";
-      return `<div class="${cls}">$${evalObj.landed_total_usd.toFixed(2)}</div><div class="text-[10px] text-slate-400">${evalObj.lead_days}d ${evalObj.tag || ""}</div>`;
+      return `<div class="${cls}">$${evalObj.landed_total_usd.toFixed(2)}</div><div class="text-[10px] text-slate-400">${evalObj.lead_days}d ${esc(evalObj.tag || "")}</div>`;
     }
 
     function recalcQuotes() {
@@ -357,17 +366,17 @@
       document.getElementById("sumOptimalTotal").textContent = `$${totalOpt.toFixed(2)} USD`;
       document.getElementById("sumPerBoard").textContent = `$${(totalOpt / boardQty).toFixed(2)} USD / placa (${country})`;
 
-      document.getElementById("sumChannels").innerHTML = `
-        <div>LCSC/JLCPCB: <span class="text-sky-300 font-bold">${counts.LCSC_JLCPCB}</span> | Local: <span class="text-emerald-300 font-bold">${counts.MERCADO_LOCAL}</span></div>
-        <div>AliExpress: <span class="text-orange-300 font-bold">${counts.ALIEXPRESS}</span> | Alibaba: <span class="text-purple-300 font-bold">${counts.ALIBABA}</span></div>
-      `;
-      document.getElementById("sumEasyEdaAudit").innerHTML = `
-        <div>Códigos C9900...: <span class="text-amber-300 font-bold">${c9900Count} detectados</span></div>
-        <div>Extended Parts: <span class="text-sky-300 font-bold">${extCount} detectada(s)</span></div>
-      `;
-      document.getElementById("sumShield").innerHTML = `
-        <span class="text-rose-300 font-bold">${cloneBlockedCount} oferta(s) clon</span> bloqueada(s) (&lt;40% LCSC) y baterías/cajas redirigidas por IATA.
-      `;
+      document.getElementById("sumChannels").innerHTML = [
+        `<div>LCSC/JLCPCB: <span class="text-sky-300 font-bold">${counts.LCSC_JLCPCB}</span> | Local: <span class="text-emerald-300 font-bold">${counts.MERCADO_LOCAL}</span></div>`,
+        `<div>AliExpress: <span class="text-orange-300 font-bold">${counts.ALIEXPRESS}</span> | Alibaba: <span class="text-purple-300 font-bold">${counts.ALIBABA}</span></div>`,
+      ].join("");
+      document.getElementById("sumEasyEdaAudit").innerHTML = [
+        `<div>Códigos C9900...: <span class="text-amber-300 font-bold">${c9900Count} detectados</span></div>`,
+        `<div>Extended Parts: <span class="text-sky-300 font-bold">${extCount} detectada(s)</span></div>`,
+      ].join("");
+      document.getElementById("sumShield").innerHTML = [
+        `<span class="text-rose-300 font-bold">${cloneBlockedCount} oferta(s) clon</span> bloqueada(s) (&lt;40% LCSC) y baterías/cajas redirigidas por IATA.`,
+      ].join("");
 
       document.getElementById("alertsList").innerHTML = alerts
         .map((a) => `<div class="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300">${a}</div>`)
