@@ -118,8 +118,14 @@ def test_normative_calculators() -> None:
     )
     assert gate_ok["can_proceed_to_easyeda"] is True
     assert gate_ok["status"] == "APPROVED_FOR_EASYEDA"
-    assert len(gate_ok["easyeda_integration_pipeline"]) == 6
-    print("  [OK] Datasheet-First Gate: aprobó tablero verificado y emitió pipeline de 6 pasos para EasyEDA Pro.")
+    assert len(gate_ok["easyeda_integration_pipeline"]) == 7
+    print("  [OK] Datasheet-First Gate: aprobó tablero verificado y emitió pipeline nativo de 7 pasos para EasyEDA Pro.")
+
+    # 1.8 Stackup oficial JLCPCB en IPC-2141A (JLC04161H-3313 para 50 Ohm / USB 90 Ohm)
+    si_jlc = mcp.calc_impedance_si(topology="microstrip", trace_width_mm=0.16, jlcpcb_stackup="JLC04161H-3313", diff_spacing_mm=0.15)
+    assert si_jlc["jlcpcb_stackup"]["name"] == "JLC04161H-3313"
+    assert 48.0 <= si_jlc["z0_characteristic_ohm"] <= 58.0
+    print(f"  [OK] Stackup JLCPCB (JLC04161H-3313, W=0.16mm): Z0={si_jlc['z0_characteristic_ohm']} Ω, Zdiff={si_jlc['z_differential_ohm']} Ω")
 
 
 def test_stdio_jsonrpc_protocol() -> None:

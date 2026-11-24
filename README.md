@@ -1,12 +1,12 @@
-# AGENT-DESIGN-PCB (v4.0) — Ingeniero Electrónico Integral, Servidor MCP Normativo y Co-Piloto de Hardware
+# AGENT-DESIGN-PCB (v4.3) — Ingeniero Electrónico Acoplado a EasyEDA Pro, Servidor MCP Normativo y Co-Piloto de Hardware
 
 > **Una iniciativa de S&D MMCALL para la comunidad.**  
-> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, basándose en conceptos reales de la física electrónica, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), co-diseño seguro con microcontroladores (**ESP32**, **STM32**, **RP2040**, **AVR**), un **servidor MCP nativo con 7 motores de cálculo determinista** y gestión inteligente de proveedores (**EasyEDA Pro / LCSC / JLCPCB**, **AliExpress** y **Alibaba**).
+> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, acoplado nativamente a **EasyEDA Pro (Device-First + LCSC/JLCPCB + Stackups Oficiales + SPICE + Transacciones seguras)**, basándose en física real, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), política de **Cero Invención (*Datasheet-First*)**, un **servidor MCP nativo con 8 motores deterministas** y gestión inteligente de proveedores (**EasyEDA Pro / LCSC / JLCPCB**, **AliExpress** y **Alibaba**).
 
-[![Versión: 4.0](https://img.shields.io/badge/Versión-4.0%20Full%20Electronic%20Engineer%20%2B%20Native%20MCP-brightgreen.svg)](#1-qué-hace-este-proyecto)
+[![Versión: 4.3](https://img.shields.io/badge/Versión-4.3%20EasyEDA%20Pro%20Native%20%2B%20Datasheet--First-brightgreen.svg)](#1-qué-hace-este-proyecto)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-blue.svg)](LICENSE)
 [![Norma de Redacción: ISO 24495-1](https://img.shields.io/badge/Documentación-ISO%2024495--1%20%7C%20ISO%2FIEC%2082079--1-success.svg)](#3-estructura-del-repositorio)
-[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.0)-blueviolet.svg)](mcp-server/)
+[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.3)-blueviolet.svg)](mcp-server/)
 [![Conector CAD: easyeda-mcp-pro](https://img.shields.io/badge/CAD%20Bridge-easyeda--mcp--pro-orange.svg)](https://github.com/oaslananka/easyeda-mcp-pro)
 
 ---
@@ -45,6 +45,7 @@
 | **Manual 11 — Guía Operativa Oficial del Editor EasyEDA** | Reglas oficiales del lienzo EasyEDA (eje $Y$ invertido, errores de *Convert to PCB*, correspondencia Pin/Pad `1,2` vs `A,C`, regiones `No Solid` y `Board Cutout`, reconstrucción de cobre `Shift+B` y anatomía de archivos Gerber `.GKO`/`.DRL`). | [11-guia-operativa-editor-easyeda.md](skills/designing-pcb-normative/references/11-guia-operativa-editor-easyeda.md) |
 | **Manual 12 — Servidor MCP Normativo del Agente** | Especificación técnica de las 8 herramientas MCP del agente (`pcb_normative_*` y `pcb_verify_connection_board`), compuerta *Datasheet-First* y resolución atómica de DRC en EasyEDA Pro. | [12-servidor-mcp-normativo-agente.md](skills/designing-pcb-normative/references/12-servidor-mcp-normativo-agente.md) |
 | **Manual 13 — Del Protoboard al PCB Profesional** | Metodología de co-diseño: política de cero invención (*Datasheet-First*), PCB de Conexión Interactivo con posicionamiento Drag & Drop, simulación real y promoción a EasyEDA Pro. | [13-del-protoboard-fisico-y-virtual-al-pcb.md](skills/designing-pcb-normative/references/13-del-protoboard-fisico-y-virtual-al-pcb.md) |
+| **Manual 14 — Maestría EasyEDA Pro y Ecosistema JLCPCB** | Explotación nativa de EasyEDA Pro: arquitectura *Device-First* (Símbolo+Footprint+3D+LCSC), workflows inteligentes, SPICE, stackups oficiales JLCPCB (`JLC04161H-3313/7628`), *Auto-Fix* y manejo real del puente 3.2.x. | [14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](skills/designing-pcb-normative/references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md) |
 | **Plantilla 1 — Ficha Técnica Viva** | Documento persistente de arquitectura, árbol de potencia, *pinout*, *stackup* y estado de avance del proyecto. | [HARDWARE-SPEC.template.md](skills/designing-pcb-normative/templates/HARDWARE-SPEC.template.md) |
 | **Plantilla 2 — Matriz de Compras y Proveedores** | Comparativa de componentes entre LCSC (`Basic/Extended`), AliExpress y Alibaba con evaluación de rating, envío, MOQ y riesgo de falsificación. | [BOM-SOURCING.template.md](skills/designing-pcb-normative/templates/BOM-SOURCING.template.md) |
 | **Plantilla 3 — Checklist de *Bring-Up* en Banco** | Registro paso a paso de pruebas en frío ($\Omega$), primer encendido con fuente limitada, medición de rieles y validación de periféricos. | [BRINGUP-CHECKLIST.template.md](skills/designing-pcb-normative/templates/BRINGUP-CHECKLIST.template.md) |
@@ -71,7 +72,7 @@ AGENT-DESIGN-PCB/
 │   └── test_mcp_and_easyeda_live.py                    # Suite de pruebas automatizadas y diagnóstico de placa
 └── skills/
     └── designing-pcb-normative/                        # Skill para el agente de IA
-        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.2)
+        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.3)
         ├── templates/                                  # Plantillas Markdown y HTML interactivas
         │   ├── HARDWARE-SPEC.template.md               # Memoria viva del hardware
         │   ├── BOM-SOURCING.template.md                # Matriz de compras (LCSC / AliExpress / Alibaba)
@@ -79,7 +80,7 @@ AGENT-DESIGN-PCB/
         │   ├── ENVIRONMENT-CONDITIONS.template.md      # Contexto y condiciones de entorno (IP, temperatura, cables)
         │   ├── VIRTUAL-BREADBOARD.template.html        # Protoboard Virtual preliminar (HTML5)
         │   └── PCB-CONNECTION-WORKBENCH.template.html  # PCB de Conexión Interactivo con Pinouts & EasyEDA JSON
-        └── references/                                 # 14 Manuales técnicos normativos (00 a 13)
+        └── references/                                 # 15 Manuales técnicos normativos (00 a 14)
             ├── 00-entrevista-y-contexto-proyecto.md
             ├── 01-esquematico-pdn-esd.md
             ├── 02-termica-aislamiento-materiales.md
@@ -93,7 +94,8 @@ AGENT-DESIGN-PCB/
             ├── 10-arquitectura-multiagente-pcb.md
             ├── 11-guia-operativa-editor-easyeda.md
             ├── 12-servidor-mcp-normativo-agente.md
-            └── 13-del-protoboard-fisico-y-virtual-al-pcb.md
+            ├── 13-del-protoboard-fisico-y-virtual-al-pcb.md
+            └── 14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md
 ```
 
 ---

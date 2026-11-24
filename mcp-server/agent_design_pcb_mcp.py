@@ -195,6 +195,14 @@ def calc_clearance_creepage(
     }
 
 
+JLCPCB_STACKUPS: Dict[str, Dict[str, Any]] = {
+    "JLC_2L_1.6mm": {"layers": 2, "dielectric_h_mm": 1.53, "er": 4.5, "copper_oz": 1.0, "description": "JLCPCB 2 capas estándar 1.6 mm FR-4"},
+    "JLC04161H-7628": {"layers": 4, "dielectric_h_mm": 0.2104, "er": 4.6, "copper_oz": 1.0, "description": "JLCPCB 4 capas Prepreg 7628 (económico)"},
+    "JLC04161H-3313": {"layers": 4, "dielectric_h_mm": 0.0994, "er": 4.05, "copper_oz": 1.0, "description": "JLCPCB 4 capas Prepreg 3313 (recomendado RF 50 Ohm / USB 90 Ohm)"},
+    "JLC04161H-2313": {"layers": 4, "dielectric_h_mm": 0.10, "er": 4.05, "copper_oz": 1.0, "description": "JLCPCB 4 capas Prepreg 2313 (alta estabilidad dieléctrica)"},
+}
+
+
 def calc_impedance_si(
     topology: str = "microstrip",
     trace_width_mm: float = 0.25,
@@ -205,12 +213,23 @@ def calc_impedance_si(
     driver_z_source_ohm: float = 20.0,
     load_z_ohm: float = 50.0,
     rise_time_ns: float = 1.0,
+    jlcpcb_stackup: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Calcula impedancia característica Z0 (Microstrip y Stripline) según IPC-2141A,
     pares diferenciales, resistencia de terminación en serie Rs, coeficiente de reflexión Gamma
-    y reglas de separación contra diafonía 3W y 5W.
+    y reglas de separación contra diafonía 3W y 5W. Soporta perfiles oficiales JLCPCB de EasyEDA Pro.
     """
+    stackup_applied = None
+    if jlcpcb_stackup:
+        preset = JLCPCB_STACKUPS.get(jlcpcb_stackup)
+        if preset is None:
+            raise ValueError(f"Stackup JLCPCB desconocido: {jlcpcb_stackup}. Opciones: {list(JLCPCB_STACKUPS.keys())}")
+        dielectric_h_mm = float(preset["dielectric_h_mm"])
+        er = float(preset["er"])
+        copper_oz = float(preset["copper_oz"])
+        stackup_applied = {"name": jlcpcb_stackup, **preset}
+
     t_mm = copper_oz * COPPER_OZ_TO_MM
     w_over_h = trace_width_mm / dielectric_h_mm
     model_valid = w_over_h <= 7.5
@@ -242,8 +261,9 @@ def calc_impedance_si(
     l_crit_mm = rise_time_ns / (6.0 * t_pd_ns_per_mm)
 
     return {
-        "standard": "IPC-2141A + Reglas SI/GND (Manual 03)",
+        "standard": "IPC-2141A + Reglas SI/GND (Manual 03) + Stackup JLCPCB/EasyEDA Pro",
         "topology": topology,
+        "jlcpcb_stackup": stackup_applied,
         "z0_characteristic_ohm": round(z0, 2),
         "z_differential_ohm": round(z_diff, 2) if z_diff is not None else None,
         "w_over_h_ratio": round(w_over_h, 2),
@@ -817,12 +837,13 @@ def verify_connection_board(
     easyeda_pipeline: List[Dict[str, Any]] = []
     if can_proceed:
         easyeda_pipeline = [
-            {"step": 1, "tool": "easyeda_project_begin_transaction", "purpose": "Iniciar transacción segura con rollback en EasyEDA Pro."},
-            {"step": 2, "tool": "easyeda_schematic_search_device / easyeda_catalog_verify_device", "purpose": "Validar LCSC ID y correspondencia exacta de pines/pads para cada equipo."},
-            {"step": 3, "tool": "easyeda_schematic_place_component + easyeda_schematic_connect_pins_by_net", "purpose": f"Colocar {len(device_map)} equipos y conectar {len(nets_summary)} redes verificadas."},
-            {"step": 4, "tool": "easyeda_erc_run + easyeda_schematic_sync_to_pcb", "purpose": "Validar ERC=0 y sincronizar netlist hacia PCB."},
-            {"step": 5, "tool": "easyeda_pcb_place_batch", "purpose": "Aplicar coordenadas en mils calculadas desde el PCB de conexión.", "placements": floorplan_audit["easyeda_place_batch_payload"]},
-            {"step": 6, "tool": "easyeda_drc_run + easyeda_pcb_rebuild_copper", "purpose": "Verificar DRC=0 tras ruteo y reconstrucción de planos GND."},
+            {"step": 1, "tool": "easyeda_bridge_status + easyeda_schematic_connectivity_fingerprint", "purpose": "Confirmar foco de documento, UUID esperado y huella base de conectividad."},
+            {"step": 2, "tool": "easyeda_project_begin_transaction", "purpose": "Iniciar transacción segura con rollback en EasyEDA Pro."},
+            {"step": 3, "tool": "easyeda_schematic_search_device + easyeda_catalog_verify_device + easyeda_schematic_device_subparts", "purpose": "Arquitectura Device-First: validar LCSC ID, stock, modelo 3D y pines exactos para cada equipo."},
+            {"step": 4, "tool": "easyeda_workflow_power_rail + easyeda_workflow_decouple_ic + easyeda_schematic_place_component + easyeda_schematic_connect_pins_by_net", "purpose": f"Construir {len(device_map)} equipos y conectar {len(nets_summary)} redes verificadas + No-Connect en pines libres."},
+            {"step": 5, "tool": "easyeda_schematic_layout_qa + easyeda_power_tree_analyze + easyeda_erc_run + easyeda_bom_quality_report + easyeda_jlcpcb_quote_workflow", "purpose": "Auditar esquemático, árbol de potencia, ERC=0 y optimización Basic vs Extended JLCPCB."},
+            {"step": 6, "tool": "easyeda_project_commit_transaction + easyeda_schematic_sync_to_pcb + easyeda_pcb_place_batch", "purpose": "Sincronizar al PCB y aplicar coordenadas en mils calculadas desde el PCB de conexión.", "placements": floorplan_audit["easyeda_place_batch_payload"]},
+            {"step": 7, "tool": "easyeda_pcb_route_geometry_review + easyeda_rule_check_summary + easyeda_pcb_production_review + easyeda_production_qa_artifacts", "purpose": "Validar DRC=0 (tras reconstrucción de cobre Shift+B), DFM y exportar paquete de fabricación."},
         ]
 
     return {
@@ -891,8 +912,13 @@ TOOLS_SCHEMA = [
                 "driver_z_source_ohm": {"type": "number", "default": 20.0},
                 "load_z_ohm": {"type": "number", "default": 50.0},
                 "rise_time_ns": {"type": "number", "default": 1.0},
+                "jlcpcb_stackup": {
+                    "type": "string",
+                    "enum": ["JLC_2L_1.6mm", "JLC04161H-7628", "JLC04161H-3313", "JLC04161H-2313"],
+                    "description": "Opcional: aplica automáticamente el espesor H, er y oz de cobre del stackup oficial JLCPCB integrado en EasyEDA Pro.",
+                },
             },
-            "required": ["trace_width_mm", "dielectric_h_mm"],
+            "required": ["trace_width_mm"],
         },
     },
     {
@@ -1042,7 +1068,7 @@ def run_stdio_server() -> None:
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "agent-design-pcb-mcp",
-                        "version": "4.2.0",
+                        "version": "4.3.0",
                     },
                 },
             }

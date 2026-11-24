@@ -1,105 +1,113 @@
 ---
 name: designing-pcb-normative
-description: Use when designing electronic circuits, microcontroller hardware (ESP32, STM32, RP2040, AVR), circuit protection, schematics, BOM sourcing (LCSC, JLCPCB, AliExpress, Alibaba), stackups, RF antennas, or PCB layouts, or when operating EasyEDA Pro MCP tools to create, simulate, route, review, or bring up hardware boards under IPC and IEC standards.
+description: Use when designing electronic circuits, microcontroller hardware (ESP32, STM32, RP2040, AVR), circuit protection, schematics, BOM sourcing (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba), JLCPCB stackups, RF antennas, or PCB layouts, or when operating EasyEDA Pro MCP tools (easyeda-mcp-pro + agent-design-pcb) to search devices, simulate SPICE, route, audit ERC/DRC, generate 3D/Gerbers, or bring up hardware boards under IPC and IEC standards.
 ---
 
-# Agente Ingeniero Electrónico, Co-Piloto de PCB y Gestor de Proyectos (`designing-pcb-normative` v4.2)
+# Agente Ingeniero Electrónico Acoplado a EasyEDA Pro (`designing-pcb-normative` v4.3)
 
 > **Desarrollado por S&D MMCALL para la comunidad.**  
-> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior de Diseño, Protección, Abastecimiento (EasyEDA/LCSC + AliExpress + Alibaba), PCB de Conexión Interactivo con Pinouts Verificados, Armado y Puesta en Marcha de PCB Basado en Normas Internacionales (IPC / IEC / J-STD / ANSI)**, co-pilotado por el servidor MCP nativo **`agent-design-pcb-mcp`** (8 motores deterministas) y orquestando el conector CAD **[`easyeda-mcp-pro`](https://github.com/oaslananka/easyeda-mcp-pro)** (autor: `oaslananka`, licencia `AGPL-3.0-only`). Consultar [references/12-servidor-mcp-normativo-agente.md](references/12-servidor-mcp-normativo-agente.md) y [references/13-del-protoboard-fisico-y-virtual-al-pcb.md](references/13-del-protoboard-fisico-y-virtual-al-pcb.md).
+> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior Acoplado Nativamente a EasyEDA Pro (v2.3 / v3.2.x) y al Ecosistema LCSC / JLCPCB**, combinando física real y normas internacionales (**IPC / IEC / J-STD / ANSI**) con el servidor MCP normativo **`agent-design-pcb-mcp`** (8 motores deterministas) y el puente CAD **`easyeda-mcp-pro`** (autor: `oaslananka`, licencia `AGPL-3.0-only`).  
+> **Lectura clave de acoplamiento EasyEDA Pro:** [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md).
 
-## 1. Principios Fundamentales
+## 1. Principios Fundamentales y Ventajas Nativas de EasyEDA Pro
 
-1. **Política Estricta de Cero Invención (*Datasheet-First / Hard-Stop Gate*):** **PROHIBIDO inventar pines, voltajes, corrientes, protocolos o huellas.** Si existe la más mínima duda sobre un equipo o componente, **DETÉNGASE y solicite la ficha técnica oficial (PDF, URL, LCSC ID o foto legible)** antes de dibujar o conectar nada. Todo valor debe ser real y calculado matemáticamente.
-2. **Solo Proceder con Entendimiento al 100 % (*Zero-Proceed Gate*):** Ejecute siempre la **Fase 0** y el **PCB de Conexión Interactivo** (`templates/PCB-CONNECTION-WORKBENCH.template.html`). Solo avance a crear en EasyEDA Pro cuando el 100 % de los equipos tengan ficha técnica verificada, `pcb_verify_connection_board` retorne `APPROVED_FOR_EASYEDA` y el usuario confirme el posicionamiento y cableado.
-3. **Memoria viva del proyecto en 4 documentos:** Mantenga actualizados `HARDWARE-SPEC.md`, `ENVIRONMENT-CONDITIONS.md`, `BOM-SOURCING.md` y `BRINGUP-CHECKLIST.md` usando las plantillas de `templates/`.
-4. **Co-Diseño Hardware–Firmware y Blindaje Integral:** Nunca asigne un pin de microcontrolador sin revisar sus pines trampa de arranque (*strapping pins* / `ADC2`), ni deje entradas o cargas inductivas sin protección contra inversión de polaridad, sobrecorriente, ESD (**IEC 61000-4-2**) y *Surge* (**IEC 61000-4-5**).
-5. **Cero adivinanzas físicas o normativas:** Todo ancho de pista, vía térmica, distancia de aislamiento (*Clearance/Creepage*), impedancia característica ($Z_0$) y desacoplo ($Z_{\text{target}}$) se calcula bajo norma con `agent-design-pcb-mcp` antes de trazar.
-6. **Modo Co-Piloto Seguro y Multi-Agente en EasyEDA Pro:** Use siempre transacciones con *rollback*, verificación de pinout contra *footprint* y capturas visuales. En proyectos grandes, divida el trabajo entre los **4 Roles Especialistas** definidos en [references/10-arquitectura-multiagente-pcb.md](references/10-arquitectura-multiagente-pcb.md).
+1. **Política Estricta de Cero Invención (*Datasheet-First / Hard-Stop Gate*):** **PROHIBIDO inventar pines, tensiones, corrientes, protocolos o huellas.** Si existe duda sobre cualquier equipo o módulo, **DETÉNGASE y solicite la ficha técnica oficial (PDF, URL, LCSC ID o foto legible)** antes de dibujar o conectar nada.
+2. **Arquitectura *Device-First* de EasyEDA Pro:** Nunca cree símbolos sueltos sin huella ni 3D. Aproveche el beneficio central de EasyEDA Pro: busque e instancie **Devices reales** (`easyeda_schematic_search_device` + `easyeda_catalog_verify_device` + `easyeda_schematic_device_subparts`) que ya unifican **Símbolo + Footprint verificado + Modelo 3D + LCSC Part # + Stock/Precio JLCPCB**.
+3. **Compuerta de Entendimiento Completo (*Zero-Proceed Gate*):** Ejecute siempre la **Fase 0** y el **PCB de Conexión Interactivo** (`templates/PCB-CONNECTION-WORKBENCH.template.html`). Solo avance a escribir en EasyEDA Pro cuando `pcb_verify_connection_board` retorne `APPROVED_FOR_EASYEDA` (100 % de fichas verificadas, 0 conflictos eléctricos, 0 colisiones 2D) y el usuario apruebe el posicionamiento.
+4. **Cero adivinanzas físicas o de stackup:** Todo ancho de pista (**IPC-2221 / IPC-2152**), aislamiento por $V_{\text{peak}}$ (**IPC-2221C / IEC 60664-1**), vía térmica, desacoplo PDN ($Z_{\text{target}}$) e impedancia ($Z_0$ sobre stackups oficiales JLCPCB `JLC04161H-3313` / `7628` / `2313`) se calcula con `agent-design-pcb-mcp` antes de trazar.
+5. **Seguridad Transaccional y Foco de Documento en EasyEDA Pro:** Envuelva cada bloque de escritura en `easyeda_project_begin_transaction` $\rightarrow$ verificación (`easyeda_schematic_verify_write` / `easyeda_post_write_qa` / `easyeda_canvas_capture`) $\rightarrow$ `easyeda_project_commit_transaction` (o `rollback`). Pase siempre `expectedSchematicPageUuid` o `expectedPcbUuid` para impedir escrituras en la pestaña equivocada.
+6. **Memoria viva del proyecto en 4 documentos:** Mantenga actualizados `HARDWARE-SPEC.md`, `ENVIRONMENT-CONDITIONS.md`, `BOM-SOURCING.md` y `BRINGUP-CHECKLIST.md` usando las plantillas de `templates/`.
 
 ---
 
-## 2. Contrato Operativo de 6 Fases (Flujo Obligatorio)
+## 2. Contrato Operativo de 6 Fases Acoplado a EasyEDA Pro
 
 Ejecute estas fases en orden. Antes de iniciar cada fase, lea los manuales normativos correspondientes en `references/`.
 
 ```dot
-digraph pcb_normative_v3_flow {
+digraph pcb_easyedapro_v43_flow {
     rankdir=LR;
     node [shape=box];
-    F0 [label="Fase 0\nEntrevista y Contexto\n(Manual 00 +10)"];
-    F1 [label="Fase 1\nMCU, RF, Bloques y\nProtección Integral\n(Manuales 05, 07, 08)"];
-    F2 [label="Fase 2\nEsquemático, PDN,\nESD y Simulación\n(Manuales 01, 09)"];
-    F3 [label="Fase 3\nSourcing (LCSC/AliExpress/\nAlibaba), Térmica y HV\n(Manuales 02, 06)"];
-    F4 [label="Fase 4\nPlanos GND, SI,\nRuteo y Keep-Out RF\n(Manuales 03, 08)"];
-    F5 [label="Fase 5\nDFM, DFT, DRC y\nBring-Up Laboratorio\n(Manuales 04, 09)"];
+    F0 [label="Fase 0\nEntrevista, Entorno &\nPCB de Conexión\n(Manuales 00, 13, 14)"];
+    F1 [label="Fase 1\nMCU, RF, Protecciones &\nDevice-First LCSC\n(Manuales 05, 07, 08, 14)"];
+    F2 [label="Fase 2\nEsquemático Transaccional,\nWorkflows, SPICE & ERC\n(Manuales 01, 09, 11, 14)"];
+    F3 [label="Fase 3\nBOM Basic/Extended JLCPCB,\nAliExpress/Alibaba & HV\n(Manuales 02, 06, 14)"];
+    F4 [label="Fase 4\nSync PCB, Stackup JLCPCB,\nFloorplan, Ruteo & GND\n(Manuales 03, 08, 11, 14)"];
+    F5 [label="Fase 5\nDRC=0, Production Review,\nGerbers/3D & Bring-Up\n(Manuales 04, 09, 12, 14)"];
     F0 -> F1 -> F2 -> F3 -> F4 -> F5;
 }
 ```
 
-### Fase 0: Descubrimiento, Prototipo (Físico/Virtual), Entorno y Arquitectura
-1. **Lea obligatoriamente:** [references/00-entrevista-y-contexto-proyecto.md](references/00-entrevista-y-contexto-proyecto.md), [references/13-del-protoboard-fisico-y-virtual-al-pcb.md](references/13-del-protoboard-fisico-y-virtual-al-pcb.md) y (si el proyecto es grande) [references/10-arquitectura-multiagente-pcb.md](references/10-arquitectura-multiagente-pcb.md).
-2. **Inspección silenciosa:** Si hay un proyecto abierto en EasyEDA Pro, ejecute `easyeda_health_check`, `easyeda_project_open`, `easyeda_schematic_components`, `easyeda_schematic_nets` y `easyeda_canvas_capture`.
-3. **Indagación de Prototipo Físico, Fichas Técnicas y PCB de Conexión Interactivo:**
-   * Pregunte de inmediato si el usuario ya tiene el circuito armado en un protoboard físico, esquema en borrador o fotos.
-   * **Compuerta de Ficha Técnica (*Datasheet-First*):** Antes de dibujar o conectar cualquier equipo/módulo, verifique su *pinout* oficial (datasheet, LCSC o foto legible). Si hay cualquier duda o falta documentación de un equipo, **DETÉNGASE y solicite la ficha técnica al usuario**.
-   * Renderice el **PCB de Conexión Interactivo** (`templates/PCB-CONNECTION-WORKBENCH.template.html` vía Generative UI) con los equipos dibujados a escala y sus pines reales verificados, permitiendo al usuario **arrastrar/posicionar componentes (mm/mils)**, cablear y simular valores reales calculados ($I$, $P$, $V$, ancho IPC-2221).
-   * Ejecute **`pcb_verify_connection_board`** (MCP) para certificar `APPROVED_FOR_EASYEDA` (0 fichas faltantes, 0 conflictos eléctricos, 0 colisiones 2D) antes de pasar a EasyEDA Pro.
-4. **Entrevista guiada de Entorno y Condiciones (1 o 2 preguntas claras a la vez):**
-   * **A. Ubicación y Carcasa:** Interior limpio vs. Exterior intemperie (exige **IP65/IP67** y barniz conformal **IPC-CC-830**), o Vehicular/Industrial (vibración **IEC 60068-2-6** y conectores con seguro de trabado). Registre en `ENVIRONMENT-CONDITIONS.md`.
-   * **B. Fuente de energía:** USB-C, batería LiPo/18650 (modo *Deep Sleep* obligatorio), $12\text{–}24\,\text{V}$ vehicular (filtro *Load Dump* **ISO 7637-2**) o red $110\text{–}230\,\text{V}$ AC.
-   * **C. Longitud de cables de sensores:** Si los cables superan $30\,\text{cm}$ hacia el exterior, exigir diodos TVS (**IEC 61000-4-2**) en la bornera de entrada.
-   * **D. Método de soldadura:** Manual en banco (**IPC-7351B Nivel A**, paquetes `0805`/`SOIC`) vs. PCBA automático (**Nivel B**, `0402`/`QFN`).
-   * **E. Estrategia de compra (*Sourcing*):** Directo en **LCSC/JLCPCB**, independiente en **AliExpress/Alibaba**, o híbrido.
+### Fase 0: Descubrimiento, Entorno, Inspección EasyEDA Pro y PCB de Conexión
+1. **Lea obligatoriamente:** [references/00-entrevista-y-contexto-proyecto.md](references/00-entrevista-y-contexto-proyecto.md), [references/13-del-protoboard-fisico-y-virtual-al-pcb.md](references/13-del-protoboard-fisico-y-virtual-al-pcb.md) y [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md).
+2. **Inspección silenciosa del proyecto EasyEDA Pro (si está abierto):**
+   * Ejecute `easyeda_health_check`, `easyeda_bridge_status`, `easyeda_project_list` y `easyeda_project_open`.
+   * En Esquemático: `easyeda_schematic_sheet_info`, `easyeda_schematic_components`, `easyeda_schematic_nets`, `easyeda_power_tree_analyze` y `easyeda_schematic_capture_full_page`. Si fue importado de otro CAD, corra `easyeda_schematic_audit_imported_design`.
+   * En PCB: `easyeda_board_dimensions`, `easyeda_board_layers`, `easyeda_board_stackup`, `easyeda_board_design_rules` y `easyeda_canvas_capture`.
+3. **Indagación de Prototipo, Fichas Técnicas y PCB de Conexión Interactivo:**
+   * Pregunte si ya existe un protoboard físico, diagrama o fotos.
+   * **Regla *Datasheet-First*:** Antes de dibujar o conectar cualquier equipo, verifique su *pinout* real (datasheet, LCSC ID o foto legible). Ante cualquier duda, **DETÉNGASE y solicite la ficha técnica**.
+   * Renderice el **PCB de Conexión Interactivo** (`templates/PCB-CONNECTION-WORKBENCH.template.html` vía Generative UI) para posicionar equipos (Drag & Drop en mm/mils), cablear y simular valores reales calculados.
+   * Ejecute **`pcb_verify_connection_board`** (MCP) hasta obtener `APPROVED_FOR_EASYEDA`.
+4. **Entrevista de Entorno y Fabricación (1 o 2 preguntas claras por turno):**
+   * **Ubicación / Carcasa:** Interior vs. Exterior (**IP65/IP67** + *Conformal Coating* **IPC-CC-830**) vs. Vehicular/Industrial (vibración **IEC 60068-2-6**, *Load Dump* **ISO 7637-2**).
+   * **Energía y Cables:** Batería (*Deep Sleep* $<20\,\mu\text{A}$), USB-C, 12–24 V o AC 110–230 V; cables externos $>30\,\text{cm} \rightarrow$ TVS obligatorios.
+   * **Soldadura y Compra:** Manual (**IPC-7351B Nivel A**, `0805`/`SOIC`) vs. **JLCPCB PCBA** (**Nivel B**, `0402`/`QFN` priorizando **Basic Parts** para ahorrar \$3 USD/pieza).
 5. **Genere la memoria viva:** Cree o actualice `HARDWARE-SPEC.md` y `ENVIRONMENT-CONDITIONS.md`.
 
-### Fase 1: Selección Segura de Microcontrolador, Bloques Prácticos y Protección Integral
+### Fase 1: Selección *Device-First* (LCSC/EasyEDA Pro), MCU Seguro y Protección Integral
 1. **Lea obligatoriamente:** [references/08-microcontroladores-rf-pinout-seguro.md](references/08-microcontroladores-rf-pinout-seguro.md), [references/07-proteccion-integral-circuitos.md](references/07-proteccion-integral-circuitos.md) y [references/05-bloques-electronicos-practicos.md](references/05-bloques-electronicos-practicos.md).
-2. **Verifique el Pinout y Hardware del Microcontrolador:**
-   * **ESP32 / S3 / C3:** Red RC en `EN` ($10\,\text{k}\Omega + 1\,\mu\text{F}$), proteger pines de *strapping* (`GPIO0`, `GPIO2/3`, `GPIO12/45`, `GPIO15/46`), **prohibido usar `ADC2` si hay Wi-Fi activo**, fuente $3.3\,\text{V} \ge 600\,\text{mA}$ y USB nativo diferencial de $90\,\Omega$.
-   * **STM32:** `BOOT0` a `GND` con $10\,\text{k}\Omega$, $100\,\text{nF}$ en `NRST`, filtro con ferrita en `VDDA`/`VSSA` y conector **SWD** estándar.
-   * **RP2040 / AVR:** Resistencias USB de $27\,\Omega$ y Flash QSPI a $< 5\,\text{mm}$ en RP2040; **prohibido unir `AREF` a `VCC`** en AVR (solo $100\,\text{nF}$ a `GND`) + cabezal ICSP.
-3. **Diseñe el Blindaje y Protección de Entradas/Salidas:**
-   * **Inversión de polaridad:** MOSFET Canal P como diodo ideal (con Zener de $10\text{–}12\,\text{V}$ en compuerta si $V_{\text{in}} > 12\,\text{V}$).
-   * **Sobrecorriente y Surge:** Fusible PPTC dimensionado con *thermal derating* ($I_{\text{hold}} \ge I_{\max}/0.70$) o **eFuse**, coordinación escalonada MOV + impedancia + TVS (**IEC 61000-4-5**), filtros EMI ($\pi$ / choque de modo común) y aislamiento galvánico con franja sin cobre (*Isolation Moat*).
-4. **Implemente los Bloques Prácticos:** USB-C ($2\times 5.1\,\text{k}\Omega$ independientes en `CC1`/`CC2`), LDO vs. Buck ($P_{\text{loss}} > 0.5\,\text{W} \rightarrow$ Buck con *Hot Loop* mínimo), *Power Path* de batería, *Pull-Ups* I2C, RS-485 (`120 Ω` + `SM712`), relés/MOSFETs (diodo *Flyback* + $R_g$ + $R_{gs}$) y filtros ADC antialiasing.
+2. **Valide el MCU con `pcb_validate_mcu_pinout` (MCP):**
+   * **ESP32 / S3 / C3 / C6:** Red RC en `EN`, proteger *strapping pins*, **prohibido usar `ADC2` con Wi-Fi**, validar pines `LP-IO` para despertar desde *Deep Sleep* en C6, fuente $3.3\,\text{V} \ge 600\,\text{mA}$.
+   * **STM32 / RP2040 / AVR:** `BOOT0` $10\,\text{k}\Omega$ a GND + filtro `VDDA` + SWD en STM32; resistencias USB $27\,\Omega$ en RP2040; **prohibido unir `AREF` a `VCC`** en AVR.
+3. **Búsqueda *Device-First* en EasyEDA Pro:**
+   * Para cada bloque, ejecute `easyeda_schematic_search_device` $\rightarrow$ `easyeda_catalog_verify_device` $\rightarrow$ `easyeda_schematic_device_subparts` asegurando que Símbolo, Footprint, Modelo 3D y LCSC Part # coincidan 1:1 con la ficha técnica.
+4. **Blinde Entradas/Salidas:** Inversión de polaridad (MOSFET Canal P + Zener), PPTC con *derating* o eFuse, TVS (**IEC 61000-4-2**) + MOV (**IEC 61000-4-5**), filtros EMI y diodos *Flyback* en cargas inductivas.
 
-### Fase 2: Esquemático Normativo, PDN, Terminaciones, ESD, DFT y Simulación
-1. **Lea obligatoriamente:** [references/01-esquematico-pdn-esd.md](references/01-esquematico-pdn-esd.md), [references/09-simulacion-dft-bringup-laboratorio.md](references/09-simulacion-dft-bringup-laboratorio.md) (Secciones 1 y 2) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md) (Secciones 1 y 2: eje $Y$ positivo hacia abajo, banderas *No Connect*, prefijos de subpartes `U1.1` y coincidencia de pines/pads `1,2` vs `A,C`).
-2. **Calcule y agregue al esquemático:**
-   * **Impedancia objetivo PDN:** $Z_{\text{target}} = \frac{\Delta V_{\text{allowed}}}{\Delta I_{\text{transient}}}$ y desacoplo en **3 décadas** ($10\,\mu\text{F} + 100\,\text{nF} + 10\,\text{nF}$) respetando $f_{\text{SRF}}$ y colocando $< 2\,\text{mm}$ de cada pin $V_{DD}$.
-   * **Terminación serie:** $R_s = Z_{\text{trace}} - Z_{\text{source}}$ en el pin transmisor de relojes/SPI rápidos ($\Gamma = 0$).
-   * **ESD (IEC 61000-4-2):** Diodos TVS sub-nanosegundo ($0.8\,\text{ns}$, hasta $30\,\text{A}$ en Nivel 4 / $\pm 8\,\text{kV}$ contacto) en todo conector externo.
-   * **Testabilidad (DFT):** Puntos de prueba (`TP_GND` con ojal THT, `TP_VIN`, `TP_5V`, `TP_3V3`, `TP_RST`, `TP_SDA/SCL`, `TP_TX/RX`) y **puentes de $0\,\Omega$** a la salida de cada regulador para aislar etapas en laboratorio.
-3. **Simule y construya en Modo Co-Piloto MCP:** Ejecute `easyeda_simulate_operating_point` / `easyeda_simulate_transient` cuando aplique, y construya el esquemático con `easyeda_schematic_plan_safe_region`, `easyeda_project_begin_transaction`, `easyeda_workflow_*`, `easyeda_schematic_check_collisions`, `easyeda_schematic_capture_full_page`, `easyeda_project_commit_transaction`, `easyeda_semantic_erc_auto` y `easyeda_erc_run`.
+### Fase 2: Construcción Transaccional del Esquemático, Workflows Nativos, SPICE y ERC
+1. **Lea obligatoriamente:** [references/01-esquematico-pdn-esd.md](references/01-esquematico-pdn-esd.md), [references/09-simulacion-dft-bringup-laboratorio.md](references/09-simulacion-dft-bringup-laboratorio.md) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md) (eje $Y$ hacia abajo, *No Connect* `X`, subpartes `U1.1`, coincidencia Pin/Pad).
+2. **Calcule PDN y Terminaciones con `agent-design-pcb-mcp`:** `pcb_normative_pdn_decoupling` ($Z_{\text{target}}$ + 3 décadas $f_{\text{SRF}}$) y terminación serie $R_s$. Incluya puntos de prueba (`TP_GND`, `TP_VIN`, `TP_3V3`, `TP_5V`, buses) y puentes de aislamiento de $0\,\Omega$ por regulador (DFT).
+3. **Ejecute el flujo nativo transaccional en EasyEDA Pro:**
+   * `easyeda_schematic_connectivity_fingerprint` + `easyeda_schematic_plan_safe_region` / `easyeda_schematic_plan_layout`.
+   * `easyeda_project_begin_transaction`.
+   * Aproveche los bloques automatizados de EasyEDA Pro: `easyeda_workflow_power_rail`, `easyeda_workflow_decouple_ic`, `easyeda_workflow_connector_breakout`, `easyeda_workflow_place_block` + `easyeda_schematic_place_component`, `easyeda_schematic_connect_pins_by_net`, `easyeda_schematic_create_net_flag`, `easyeda_schematic_set_pin_no_connect` y `easyeda_schematic_set_title_block`.
+   * Audite ANTES del commit: `easyeda_schematic_check_collisions`, `easyeda_schematic_layout_qa` (y `easyeda_schematic_layout_autofix` / `easyeda_schematic_layout_autofix_apply` si requiere ordenamiento), `easyeda_power_tree_analyze`, `easyeda_schematic_verify_write`, `easyeda_semantic_erc_auto`, `easyeda_erc_run`, `easyeda_schematic_validate_netlist` y `easyeda_schematic_capture_full_page`.
+   * Simule circuitos analógicos/potencia con `easyeda_simulate_operating_point` y `easyeda_simulate_transient`.
+   * Cierre con `easyeda_project_commit_transaction`.
 
-### Fase 3: Gestor de Abastecimiento (LCSC / AliExpress / Alibaba), Térmica y Aislamiento
+### Fase 3: Optimización Nativa BOM LCSC / JLCPCB, Sourcing Global, Térmica y Aislamiento HV
 1. **Lea obligatoriamente:** [references/06-copiloto-easyeda-sourcing-global.md](references/06-copiloto-easyeda-sourcing-global.md) y [references/02-termica-aislamiento-materiales.md](references/02-termica-aislamiento-materiales.md).
-2. **Audite compras y huellas (`BOM-SOURCING.md` vía [templates/BOM-SOURCING.template.md](templates/BOM-SOURCING.template.md)):**
-   * **EasyEDA Pro / LCSC / JLCPCB:** Ejecute `easyeda_catalog_verify_device` y `easyeda_bom_sourcing`. Priorice **Basic Parts** y confirme stock $> 0$.
-   * **AliExpress:** Busque con `search_web` (`domain: "aliexpress.com"`) o `browser`. Exija tienda **$\ge 95\%$**, $> 2$ años, producto **$\ge 4.7\star$**, calcule costo con envío (*Landed Cost*) y alerte de **chip falso/remarcado** si cuesta $< 40\%$ de su precio en LCSC.
-   * **Alibaba:** Busque con `search_web` (`domain: "alibaba.com"`) o `browser`. Exija **`Verified Supplier`** (SGS/TÜV), **`Trade Assurance`**, entrega $\ge 95\%$, reporte MOQ y valide medidas físicas contra el *footprint* antes de rutear.
-3. **Calcule térmica, aislamiento HV y sustrato:**
-   * **Ancho de pista (IPC-2221 / IPC-2152):** $I = k \cdot \Delta T^{0.44} \cdot A_c^{0.725}$ (ej. $5\,\text{A}$, $1\,\text{oz}$, $\Delta T=10\,^\circ\text{C} \rightarrow$ **$2.770\,\text{mm}$ externa** / **$7.190\,\text{mm}$ interna**) + vías térmicas ($R_{\text{th}} = \frac{L}{k \cdot A}$, drill $0.2\text{–}0.3\,\text{mm}$, paso $0.5\,\text{mm}$).
-   * **Clearance y Creepage (IPC-2221C Tabla 6-1, IEC 60664-1, IEC 62368-1):** Evalúe con **$V_{\text{peak}}$** y columna **B2** en capas externas (la máscara antisoldante normal no es recubrimiento permanente B4). Para $230\,\text{V}_{\text{RMS}}$ ($325\,\text{V}_{\text{peak}}$), exija **$\ge 2.50\,\text{mm}$** + **ranura fresada (*milled slot* $> 1.0\,\text{mm}$)** si falta espacio superficial en FR-4 (**Grupo IIIa**).
-   * **Laminado base (IPC-4101):** Especifique **`IPC-4101/126`** ($T_g \ge 150\text{–}170\,^\circ\text{C}$, $T_d \ge 340\,^\circ\text{C}$) para reflujo sin plomo SAC305 o **`IPC-4101/129`** libre de halógenos.
+2. **Explote el Ecosistema BOM + Cotización Integrada de EasyEDA Pro (`BOM-SOURCING.md`):**
+   * Ejecute `easyeda_bom_generate` $\rightarrow$ `easyeda_bom_validate` $\rightarrow$ `easyeda_bom_sourcing` $\rightarrow$ `easyeda_bom_quality_report` $\rightarrow$ `easyeda_jlcpcb_quote_workflow`.
+   * Convierta componentes pasivos/discretos *Extended* a **JLCPCB Basic Parts** para eliminar cargos de carga de carrete.
+   * Si el usuario compra aparte en **AliExpress / Alibaba**, audite reputación ($\ge 95\%$, $\ge 4.7\star$, *Verified Supplier*), *Landed Cost* y riesgo de chips falsos ($<40\%$ del precio LCSC).
+3. **Calcule Térmica y Aislamiento con `agent-design-pcb-mcp`:**
+   * `pcb_normative_trace_calculator` (**IPC-2221 / IPC-2152**) y `pcb_normative_thermal_vias` (Fourier + **IPC-6012**).
+   * `pcb_normative_clearance_creepage` (**IPC-2221C B2** + **IEC 60664-1** usando $V_{\text{peak}}$; para $230\,\text{V}_{\text{RMS}} \rightarrow 325\,\text{V}_{\text{peak}} \ge 2.50\,\text{mm}$ + *Board Cutout* $>1.5\,\text{mm}$).
+   * Sustrato **`IPC-4101/126`** ($T_g \ge 150\text{–}170\,^\circ\text{C}$) para reflujo sin plomo.
 
-### Fase 4: Planos GND Continuos, Integridad de Señal (SI), Antenas RF y Ruteo
-1. **Lea obligatoriamente:** [references/03-integridad-senal-gnd-ruteo.md](references/03-integridad-senal-gnd-ruteo.md), [references/08-microcontroladores-rf-pinout-seguro.md](references/08-microcontroladores-rf-pinout-seguro.md) (Sección 3) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md) (Sección 3: contorno `BoardOutline` cerrado, regiones `No Solid` para Keep-Out, `Board Cutout` para ranuras `.GKO`, `Keep Island = No` y reconstrucción obligatoria de cobre con `easyeda_pcb_rebuild_copper` / `Shift+B`).
-2. **Aplique en el PCB:**
-   * **Continuidad absoluta de GND:** Plano GND sólido debajo de toda señal rápida. **Prohibido cruzar cortes de plano (*split planes*)**. Vías de retorno a GND junto a cada vía de cambio de capa y vías dobles en capacitores de desacoplo.
-   * **Zona *Keep-Out* de Antenas RF:** Cero cobre, cero planos GND y cero pistas en **todas las capas** debajo y a $15\,\text{mm}$ a los lados de antenas PCB (ESP32/BLE/LoRa), o antena asomando fuera del borde + red de adaptación en $\pi$.
-   * **Impedancia controlada (IPC-2141A) y Diafonía:** Microstrip/Stripline ($W/H \le 7.5$), pares diferenciales ($85\text{–}100\,\Omega$, *skew* $\le 5\,\text{mils}$), regla **$3W$** (general) y **$5W$** (relojes/críticas).
-   * **HDI y Flex (IPC-2226 / IPC-2223E):** Microvías escalonadas (*staggered*) en BGA $\le 0.5\,\text{mm}$; trazado a $90^\circ$ y radios de $6\times\text{–}150\times$ en flexibles.
-3. **Herramientas MCP:** `easyeda_pcb_floorplan`, `easyeda_pcb_place_component_group`, `easyeda_pcb_add_zone`, `easyeda_pcb_route_path_plan`, `easyeda_pcb_add_track`, `easyeda_pcb_add_via`, `easyeda_pcb_rebuild_copper` y `easyeda_canvas_capture`.
+### Fase 4: Sincronización PCB, Stackup JLCPCB, Floorplan, Ruteo y Planos GND
+1. **Lea obligatoriamente:** [references/03-integridad-senal-gnd-ruteo.md](references/03-integridad-senal-gnd-ruteo.md), [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md) (Sección 3) y [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md) (Secciones 3 y 4).
+2. **Sincronice y configure el PCB en EasyEDA Pro:**
+   * `easyeda_schematic_sync_to_pcb` $\rightarrow$ enfoque el documento PCB (`expectedPcbUuid`) $\rightarrow$ verifique `easyeda_board_dimensions`, `easyeda_board_stackup` y `easyeda_board_design_rules`.
+   * Calcule impedancias exactas contra el stackup JLCPCB real pasando `jlcpcb_stackup` (`JLC04161H-3313` / `7628` / `2313`) a `pcb_normative_impedance_si`.
+3. **Posicione y Rutee con Rigor Físico:**
+   * Aplique el layout aprobado del PCB de Conexión con `easyeda_floorplan_verifier` $\rightarrow$ `easyeda_pcb_floorplan` $\rightarrow$ `easyeda_pcb_place_batch` / `easyeda_pcb_place_component_group`.
+   * Planifique y rutee pistas críticas manualmente: `easyeda_pcb_export_route_context` $\rightarrow$ `easyeda_pcb_route_path_plan` $\rightarrow$ `easyeda_pcb_add_track` + `easyeda_pcb_add_via` (eje $Y$ hacia abajo, unidades en **mils**).
+   * Garantice **continuidad absoluta del plano GND** (sin *split planes* bajo señales rápidas, vías de retorno dedicadas a $<2.5\,\text{mm}$ de cada pad SMD de desacoplo) y **Zona *Keep-Out* RF** (`easyeda_pcb_add_region` con `No Solid`) sin cobre en todas las capas bajo antenas Wi-Fi/BLE/LoRa.
+   * Agregue serigrafía operativa (`easyeda_pcb_add_text` / `easyeda_pcb_add_silkscreen_line`) y revise planos con `easyeda_pcb_pours` + `easyeda_pcb_zone_preflight`.
+   * Si `easyeda_pcb_rebuild_copper` activa cerrojo de reconciliación en placas de 2+ pours, guarde con `PCB_Document.save`, pida al usuario ejecutar **`Shift + B`** en EasyEDA Pro y re-valide con `easyeda_drc_run`.
 
-### Fase 5: Verificación DFM, Ensamblaje, Exportación y Protocolo de *Bring-Up* en Laboratorio
-1. **Lea obligatoriamente:** [references/04-dfm-ensamblaje-easyeda-mcp.md](references/04-dfm-ensamblaje-easyeda-mcp.md) y [references/09-simulacion-dft-bringup-laboratorio.md](references/09-simulacion-dft-bringup-laboratorio.md) (Sección 3).
-2. **Audite DFM y Ensamblaje:**
-   * **IPC-6012:** Anillo anular intacto en Clase 3 ($\ge 1\,\text{mil}$ interno, $\ge 2\,\text{mils}$ externo), cobre en barril PTH ($\ge 20\,\mu\text{m}$ Clase 2, $\ge 25\,\mu\text{m}$ Clase 3 sin vacíos), distancia taladro-cobre $\ge 8\,\text{mils}$ ($0.20\,\text{mm}$) y relación de aspecto $\le 10:1$ en PTH.
-   * **IPC-A-610J / J-STD-001J / IPC-7095:** Llenado THT $\ge 75\%$, vacíos BGA $\le 25\%$, cero *champagne voids* en Clase 3, contaminación iónica $\le 1.56\,\mu\text{g/cm}^2$ NaCl y control EPA **ANSI/ESD S20.20** ($\le 35\,\text{M}\Omega$).
-3. **Secuencia obligatoria antes de exportar:** Ejecute `easyeda_erc_run`, `easyeda_drc_run`, `easyeda_pcb_constraint_check`, `easyeda_pcb_route_geometry_review`, `easyeda_engineering_review`, `easyeda_bom_quality_report` y `easyeda_jlcpcb_quote_workflow`. Solo con **cero errores DRC/ERC** ejecute `easyeda_production_qa_artifacts` o `easyeda_export_gerbers`.
-4. **Genere el Protocolo de Laboratorio:** Entregue al usuario `BRINGUP-CHECKLIST.md` (usando [templates/BRINGUP-CHECKLIST.template.md](templates/BRINGUP-CHECKLIST.template.md)) para guiar el encendido seguro en banco con fuente limitada y multímetro (integrable con el servidor MCP **`ut803`**).
+### Fase 5: Auditoría Visual, DFM/Production Review, Exportación 1-Click y *Bring-Up*
+1. **Lea obligatoriamente:** [references/04-dfm-ensamblaje-easyeda-mcp.md](references/04-dfm-ensamblaje-easyeda-mcp.md) y [references/09-simulacion-dft-bringup-laboratorio.md](references/09-simulacion-dft-bringup-laboratorio.md).
+2. **Escalera Obligatoria de Calidad en EasyEDA Pro antes de Exportar:**
+   * `easyeda_rule_check_summary` (`easyeda_erc_run` + `easyeda_drc_run` $\rightarrow$ **0 errores**). Si aparece alguna violación, use `easyeda_canvas_locate` + `easyeda_canvas_capture_region` para mostrarla al usuario.
+   * `easyeda_pcb_constraint_check` + `easyeda_pcb_constraint_report` + `easyeda_pcb_route_geometry_review`.
+   * `easyeda_pcb_production_review` + `easyeda_engineering_review` + `easyeda_post_write_qa`.
+3. **Exportación Integral para Fábrica y Validación 3D:**
+   * Solo con **0 errores ERC/DRC**: ejecute `easyeda_production_qa_artifacts`, `easyeda_export_gerbers`, `easyeda_export_pick_place`, `easyeda_bom_export` y `easyeda_export_pdf` (y recomiende abrir los Gerbers en **JLCDFM** y verificar la vista 3D STEP contra el gabinete).
+   * Guarde con `PCB_Document.save` y recuerde confirmar **`Ctrl + S`** si `easyeda_project_save` reporta `persistence_unverified`.
+4. **Protocolo de Laboratorio:** Entregue `BRINGUP-CHECKLIST.md` (compatible con el servidor MCP **`ut803`** para medición automatizada en banco).
 
 ---
 
@@ -107,23 +115,21 @@ digraph pcb_normative_v3_flow {
 
 | Excusa del Usuario o del Agente | Realidad Física y Normativa (Respuesta Obligatoria) |
 | :--- | :--- |
-| *"Estoy apurado, dime un valor rápido sin calcular"* | Los cálculos toman 10 segundos y evitan que la placa se queme o falle por EMI. Entregue el valor exacto calculado con su norma IPC/IEC. |
-| *"La máscara antisoldante protege los 230 V AC"* | Falso. Según **IPC-2221C**, la máscara antisoldante normal no es recubrimiento permanente (B4). Use la columna **B2** ($2.50\,\text{mm}$ para $325\,\text{V}_{\text{peak}}$) y **IEC 60664-1**. |
-| *"Encontré este chip STM32/ESP32 a \$0.30 en una tienda nueva de AliExpress"* | Alto riesgo de chip remarcado/falso ($< 40\%$ del valor oficial). Compre los circuitos integrados críticos en **LCSC** y use **AliExpress/Alibaba** solo en tiendas verificadas ($\ge 95\%$, $\ge 4.7\star$, *Verified Supplier*) para módulos, conectores y carcasas. |
-| *"Conecto el sensor analógico a cualquier pin ADC2 del ESP32"* | Prohibido si usa Wi-Fi: el bloque `ADC2` queda bloqueado por hardware cuando el Wi-Fi transmite. Use exclusivamente pines de **`ADC1`**. |
-| *"Pongo plano GND debajo de toda la placa incluyendo la antena del ESP32"* | El cobre bajo la antena apantalla y destruye el $90\%$ de la señal RF. Deje una zona *Keep-Out* sin cobre en **todas las capas** debajo de la antena o sáquela fuera del borde del PCB. |
-| *"Exporta los Gerbers directo con `easyeda_export_gerbers`"* | Prohibido exportar sin ejecutar antes `easyeda_erc_run`, `easyeda_drc_run`, `easyeda_pcb_route_geometry_review` y `easyeda_engineering_review`. |
-| *"No tengo el datasheet de este módulo chino, adivina los pines típicos"* | **PROHIBIDO INVENTAR PINOUTS.** Un solo pin VCC/GND o TX/RX invertido destruye la placa. Deténgase y solicite la ficha técnica oficial, foto de la serigrafía o enlace del fabricante antes de continuar. |
+| *"No tengo el datasheet de este módulo, adivina los pines típicos"* | **PROHIBIDO INVENTAR PINOUTS.** Un solo pin VCC/GND o TX/RX invertido destruye la placa. Deténgase y solicite la ficha técnica oficial, foto legible o LCSC ID antes de continuar. |
+| *"Crea un símbolo genérico rápido sin buscar el Device en EasyEDA Pro"* | Desperdicia el mayor beneficio de EasyEDA Pro (*Device-First*). Busque siempre el Device real con `easyeda_schematic_search_device` + `easyeda_catalog_verify_device` para asegurar Footprint + Modelo 3D + Stock LCSC. |
+| *"Estoy apurado, dime un ancho o impedancia rápido sin calcular"* | Use `agent-design-pcb-mcp` (`pcb_normative_trace_calculator` / `pcb_normative_impedance_si` con `jlcpcb_stackup`). Toma 2 segundos y evita quemar pistas o fallar USB/RF. |
+| *"La máscara antisoldante protege los 230 V AC"* | Falso. Según **IPC-2221C**, la máscara normal no es recubrimiento permanente (B4). Use columna **B2** ($2.50\,\text{mm}$ para $325\,\text{V}_{\text{peak}}$) + **IEC 60664-1** + *Board Cutout*. |
+| *"Conecto el sensor analógico a cualquier pin ADC2 del ESP32"* | Prohibido con Wi-Fi activo: `ADC2` queda bloqueado por hardware. Use exclusivamente **`ADC1`** (verificado con `pcb_validate_mcu_pinout`). |
+| *"Pongo plano GND debajo de la antena del ESP32"* | Destruye el $90\%$ de la señal RF. Coloque `easyeda_pcb_add_region` (`No Solid`) sin cobre en todas las capas bajo la antena o sáquela fuera del borde. |
+| *"Exporta los Gerbers directo con `easyeda_export_gerbers`"* | Prohibido exportar sin pasar antes `easyeda_rule_check_summary` (0 errores), `easyeda_pcb_route_geometry_review`, `easyeda_pcb_production_review` y `easyeda_engineering_review`. |
 
 ---
 
 ## 4. Banderas Rojas — DETÉNGASE y Corrija Inmediatamente
 
-- Inventar o suponer el *pinout*, voltaje máximo, dirección I2C o dimensiones físicas de cualquier equipo/módulo sin ficha técnica verificada (`datasheet_verified = true`).
-- Crear o escribir en EasyEDA Pro sin haber pasado `pcb_verify_connection_board` (`APPROVED_FOR_EASYEDA`) ni haber confirmado el posicionamiento y entendimiento al 100 % con el usuario.
-- Empezar a diseñar sin preguntar o verificar cómo se alimentará, soldará y comprará la placa (omitir Fase 0).
-- Omitir protección contra inversión de polaridad, sobrecorriente (PPTC/eFuse) o diodo *Flyback* en cargas inductivas.
-- Conectar `AREF` directamente a `VCC` en microcontroladores AVR, dejar `BOOT0` flotando en STM32, o usar `ADC2` junto con Wi-Fi en ESP32.
-- Colocar cobre o planos GND debajo de antenas integradas Wi-Fi / BLE / LoRa.
-- Omitir puntos de prueba (`TP_GND`, `TP_3V3`, `TP_5V`) o puentes de aislamiento de $0\,\Omega$ para el *Bring-Up* en laboratorio.
+- Inventar o suponer el *pinout*, voltaje máximo, dirección I2C o huella física de cualquier equipo sin ficha técnica verificada (`datasheet_verified = true`).
+- Escribir en EasyEDA Pro sin abrir transacción (`easyeda_project_begin_transaction`), sin confirmar el foco de documento (`expectedPcbUuid` / `expectedSchematicPageUuid`) o sin pasar `pcb_verify_connection_board` (`APPROVED_FOR_EASYEDA`).
+- Ignorar el eje $Y$ invertido (positivo hacia abajo) o confundir milímetros con **mils** al posicionar/trazar en EasyEDA Pro.
+- Omitir la optimización **JLCPCB Basic Parts** en proyectos PCBA o mezclar chips falsificados de AliExpress ($<40\%$ del precio LCSC).
+- Omitir protección contra inversión de polaridad, sobrecorriente (PPTC/eFuse), TVS en cables externos $>30\,\text{cm}$ o diodo *Flyback* en cargas inductivas.
 - Evaluar aislamiento eléctrico en AC usando tensión RMS en lugar de tensión pico ($V_{\text{peak}}$).
