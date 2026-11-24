@@ -653,6 +653,191 @@ def analyze_raw_easyeda_pcb_data(
     }
 
 
+def verify_connection_board(
+    board_width_mm: float,
+    board_height_mm: float,
+    devices: List[Dict[str, Any]],
+    connections: List[Dict[str, Any]],
+    chamfer_mm: float = 0.0,
+    origin_mil: Tuple[float, float] = (0.0, 0.0),
+) -> Dict[str, Any]:
+    """
+    Compuerta estricta Datasheet-First y Validador Eléctrico/Físico para el PCB de Conexión.
+    - Bloquea la promoción a EasyEDA Pro si algún equipo carece de ficha técnica verificada.
+    - Verifica existencia real de pines, compatibilidad de tensiones lógicas, cortocircuitos
+      de rieles, continuidad de referencia GND y colisiones 2D de posicionamiento.
+    - Genera el plan de colocación en mils y la secuencia de llamadas para easyeda-mcp-pro.
+    """
+    missing_datasheets: List[Dict[str, Any]] = []
+    electrical_errors: List[str] = []
+    electrical_warnings: List[str] = []
+    device_map: Dict[str, Dict[str, Any]] = {}
+    pin_lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    floorplan_components: List[Dict[str, Any]] = []
+
+    for dev in devices:
+        des = str(dev.get("designator", "")).strip()
+        name = str(dev.get("name", des)).strip()
+        if not des:
+            electrical_errors.append("Existe un equipo sin designador (ej. U1, J1, M1).")
+            continue
+
+        device_map[des] = dev
+        verified = bool(dev.get("datasheet_verified", False))
+        source = str(dev.get("datasheet_source", "")).strip()
+        pins = dev.get("pins", []) or []
+
+        if not verified or not source or len(pins) == 0:
+            missing_datasheets.append({
+                "designator": des,
+                "name": name,
+                "reason": (
+                    "Falta verificación de ficha técnica (datasheet_verified=true y datasheet_source) "
+                    "o definición real de pines. DETÉNGASE y solicite la ficha técnica al usuario."
+                ),
+            })
+
+        for pin in pins:
+            p_num = str(pin.get("number", "")).strip()
+            p_name = str(pin.get("name", p_num)).strip()
+            if p_num:
+                pin_lookup[(des, p_num)] = pin
+            if p_name:
+                pin_lookup[(des, p_name)] = pin
+
+        floorplan_components.append({
+            "designator": des,
+            "x_mm": float(dev.get("x_mm", 0.0)),
+            "y_mm": float(dev.get("y_mm", 0.0)),
+            "width_mm": float(dev.get("width_mm", 10.0)),
+            "height_mm": float(dev.get("height_mm", 10.0)),
+            "rotation": float(dev.get("rotation", 0.0)),
+        })
+
+    # Validar conexiones reales punto a punto y agrupadas por net
+    nets_summary: Dict[str, List[Dict[str, Any]]] = {}
+    devices_with_gnd = set()
+
+    for idx, conn in enumerate(connections, start=1):
+        net = str(conn.get("net", f"NET_{idx}")).strip()
+        f_dev = str(conn.get("from_device", "")).strip()
+        f_pin_id = str(conn.get("from_pin", "")).strip()
+        t_dev = str(conn.get("to_device", "")).strip()
+        t_pin_id = str(conn.get("to_pin", "")).strip()
+
+        p_from = pin_lookup.get((f_dev, f_pin_id))
+        p_to = pin_lookup.get((t_dev, t_pin_id))
+
+        if p_from is None:
+            electrical_errors.append(
+                f"Conexión #{idx} ({net}): Pin '{f_pin_id}' no existe en el pinout verificado de '{f_dev}'. Prohibido inventar pines."
+            )
+            continue
+        if p_to is None:
+            electrical_errors.append(
+                f"Conexión #{idx} ({net}): Pin '{t_pin_id}' no existe en el pinout verificado de '{t_dev}'. Prohibido inventar pines."
+            )
+            continue
+
+        nets_summary.setdefault(net, []).append({
+            "from": f"{f_dev}.{p_from.get('name', f_pin_id)}",
+            "to": f"{t_dev}.{p_to.get('name', t_pin_id)}",
+            "from_pin": p_from,
+            "to_pin": p_to,
+        })
+
+        t_from = str(p_from.get("type", "signal")).lower()
+        t_to = str(p_to.get("type", "signal")).lower()
+        v_from = p_from.get("voltage_v")
+        v_to = p_to.get("voltage_v")
+        tol_5v_from = bool(p_from.get("tolerant_5v", False))
+        tol_5v_to = bool(p_to.get("tolerant_5v", False))
+
+        if t_from == "gnd" or t_to == "gnd" or net.upper() == "GND":
+            if t_from == "gnd":
+                devices_with_gnd.add(f_dev)
+            if t_to == "gnd":
+                devices_with_gnd.add(t_dev)
+
+        # Cortocircuito directo alimentación <-> GND
+        if (t_from.startswith("power") and t_to == "gnd") or (t_to.startswith("power") and t_from == "gnd"):
+            electrical_errors.append(
+                f"CORTOCIRCUITO CRÍTICO en red '{net}': {f_dev}.{f_pin_id} ({t_from}) conectado directamente a {t_dev}.{t_pin_id} ({t_to})."
+            )
+
+        # Incompatibilidad de niveles de tensión
+        if v_from is not None and v_to is not None:
+            vf = float(v_from)
+            vt = float(v_to)
+            if abs(vf - vt) > 0.6:
+                # Permitir si el de menor voltaje es explícitamente 5V-tolerant y el otro es <= 5.5V
+                if not ((vf <= 3.6 and tol_5v_from and vt <= 5.5) or (vt <= 3.6 and tol_5v_to and vf <= 5.5)):
+                    electrical_errors.append(
+                        f"INCOMPATIBILIDAD DE VOLTAJE en red '{net}': {f_dev}.{f_pin_id} ({vf} V) -> {t_dev}.{t_pin_id} ({vt} V). "
+                        "Requiere traslador de nivel lógico o divisor resistivo calculado."
+                    )
+
+        # Verificación de corriente máxima en pin de salida
+        i_load = conn.get("expected_current_ma")
+        if i_load is not None:
+            i_val = float(i_load)
+            max_from = p_from.get("max_current_ma")
+            max_to = p_to.get("max_current_ma")
+            if max_from is not None and i_val > float(max_from):
+                electrical_errors.append(
+                    f"SOBRECORRIENTE en red '{net}': corriente calculada {i_val} mA excede el máximo de {f_dev}.{f_pin_id} ({max_from} mA)."
+                )
+            if max_to is not None and i_val > float(max_to):
+                electrical_errors.append(
+                    f"SOBRECORRIENTE en red '{net}': corriente calculada {i_val} mA excede el máximo de {t_dev}.{t_pin_id} ({max_to} mA)."
+                )
+
+    # Verificar que equipos con pin GND definido estén conectados a GND
+    for des, dev in device_map.items():
+        has_gnd_pin = any(str(p.get("type", "")).lower() == "gnd" for p in (dev.get("pins", []) or []))
+        if has_gnd_pin and des not in devices_with_gnd:
+            electrical_warnings.append(
+                f"El equipo '{des}' ({dev.get('name', des)}) posee pin GND pero no tiene conexión registrada a la referencia común GND."
+            )
+
+    floorplan_audit = audit_floorplan_2d(
+        board_width_mm=board_width_mm,
+        board_height_mm=board_height_mm,
+        chamfer_mm=chamfer_mm,
+        components=floorplan_components,
+        origin_mil=origin_mil,
+    )
+
+    can_proceed = (
+        len(missing_datasheets) == 0
+        and len(electrical_errors) == 0
+        and floorplan_audit["passed"]
+    )
+
+    easyeda_pipeline: List[Dict[str, Any]] = []
+    if can_proceed:
+        easyeda_pipeline = [
+            {"step": 1, "tool": "easyeda_project_begin_transaction", "purpose": "Iniciar transacción segura con rollback en EasyEDA Pro."},
+            {"step": 2, "tool": "easyeda_schematic_search_device / easyeda_catalog_verify_device", "purpose": "Validar LCSC ID y correspondencia exacta de pines/pads para cada equipo."},
+            {"step": 3, "tool": "easyeda_schematic_place_component + easyeda_schematic_connect_pins_by_net", "purpose": f"Colocar {len(device_map)} equipos y conectar {len(nets_summary)} redes verificadas."},
+            {"step": 4, "tool": "easyeda_erc_run + easyeda_schematic_sync_to_pcb", "purpose": "Validar ERC=0 y sincronizar netlist hacia PCB."},
+            {"step": 5, "tool": "easyeda_pcb_place_batch", "purpose": "Aplicar coordenadas en mils calculadas desde el PCB de conexión.", "placements": floorplan_audit["easyeda_place_batch_payload"]},
+            {"step": 6, "tool": "easyeda_drc_run + easyeda_pcb_rebuild_copper", "purpose": "Verificar DRC=0 tras ruteo y reconstrucción de planos GND."},
+        ]
+
+    return {
+        "gate_name": "DATASHEET_FIRST_ZERO_PROCEED_GATE",
+        "can_proceed_to_easyeda": can_proceed,
+        "status": "APPROVED_FOR_EASYEDA" if can_proceed else "BLOCKED_PENDING_VERIFICATION",
+        "missing_datasheets": missing_datasheets,
+        "electrical_errors": electrical_errors,
+        "electrical_warnings": electrical_warnings,
+        "floorplan_audit": floorplan_audit,
+        "verified_nets_count": len(nets_summary),
+        "easyeda_integration_pipeline": easyeda_pipeline,
+    }
+
+
 # ============================================================================
 # 2. SERVIDOR MCP JSON-RPC 2.0 (STDIO)
 # ============================================================================
@@ -769,6 +954,30 @@ TOOLS_SCHEMA = [
             "required": ["board_width_mm", "board_height_mm", "components"],
         },
     },
+    {
+        "name": "pcb_verify_connection_board",
+        "description": "Compuerta estricta Datasheet-First para el PCB de Conexión: bloquea el avance si falta la ficha técnica de algún equipo, valida pinouts reales sin invención, detecta cortos/incompatibilidad de voltaje/sobrecorriente, audita posicionamiento 2D y emite el pipeline exacto para EasyEDA Pro.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "board_width_mm": {"type": "number"},
+                "board_height_mm": {"type": "number"},
+                "chamfer_mm": {"type": "number", "default": 0.0},
+                "origin_mil": {"type": "array", "items": {"type": "number"}, "default": [0.0, 0.0]},
+                "devices": {
+                    "type": "array",
+                    "description": "Lista de equipos con designator, name, datasheet_verified, datasheet_source, x_mm, y_mm, width_mm, height_mm, rotation y pins[].",
+                    "items": {"type": "object"},
+                },
+                "connections": {
+                    "type": "array",
+                    "description": "Lista de conexiones punto a punto con net, from_device, from_pin, to_device, to_pin y expected_current_ma opcional.",
+                    "items": {"type": "object"},
+                },
+            },
+            "required": ["board_width_mm", "board_height_mm", "devices", "connections"],
+        },
+    },
 ]
 
 
@@ -794,6 +1003,16 @@ def handle_tool_call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             components=args["components"],
             edge_margin_mm=args.get("edge_margin_mm", 0.8),
             min_courtyard_gap_mm=args.get("min_courtyard_gap_mm", 0.4),
+            origin_mil=(float(orig[0]), float(orig[1])),
+        )
+    if name == "pcb_verify_connection_board":
+        orig = tuple(args.get("origin_mil", [0.0, 0.0]))
+        return verify_connection_board(
+            board_width_mm=args["board_width_mm"],
+            board_height_mm=args["board_height_mm"],
+            devices=args["devices"],
+            connections=args["connections"],
+            chamfer_mm=args.get("chamfer_mm", 0.0),
             origin_mil=(float(orig[0]), float(orig[1])),
         )
     raise ValueError(f"Herramienta desconocida: {name}")
@@ -823,7 +1042,7 @@ def run_stdio_server() -> None:
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "agent-design-pcb-mcp",
-                        "version": "4.0.0",
+                        "version": "4.2.0",
                     },
                 },
             }

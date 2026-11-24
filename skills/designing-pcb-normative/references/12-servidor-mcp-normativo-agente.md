@@ -144,6 +144,21 @@ flowchart TD
 
 ---
 
+### 3.8. `pcb_verify_connection_board` (Compuerta *Datasheet-First* y Pipeline EasyEDA Pro)
+* **Propósito:** Actuar como compuerta dura (*Hard-Stop Gate*) entre el **PCB de Conexión Interactivo** y la creación automatizada en EasyEDA Pro.
+* **Entradas:**
+  * `board_width_mm`, `board_height_mm`, `chamfer_mm`, `origin_mil`: Geometría de la placa.
+  * `devices` (list): Equipos con `designator`, `name`, `datasheet_verified`, `datasheet_source`, posición `(x_mm, y_mm, width_mm, height_mm, rotation)` y lista `pins[]` con `number`, `name`, `type`, `voltage_v`, `max_current_ma`, `tolerant_5v`.
+  * `connections` (list): Conexiones punto a punto (`net`, `from_device`, `from_pin`, `to_device`, `to_pin`, `expected_current_ma`).
+* **Reglas de Bloqueo Automático (`can_proceed_to_easyeda: false`):**
+  1. Cualquier equipo sin `datasheet_verified: true`, sin `datasheet_source` o con `pins[]` vacío $\rightarrow$ reporta `missing_datasheets` y ordena solicitar la ficha técnica al usuario.
+  2. Cualquier conexión que referencie un pin inexistente en el *pinout* verificado (cero invención).
+  3. Cortocircuito directo `power` $\leftrightarrow$ `gnd`, incompatibilidad de voltaje $>0.6\,\text{V}$ sin tolerancia $5\,\text{V}$, sobrecorriente sobre `max_current_ma` o colisiones físicas 2D.
+* **Salida Estructurada cuando Aprueba (`APPROVED_FOR_EASYEDA`):**
+  * Emite `easyeda_integration_pipeline` con la secuencia exacta de herramientas (`easyeda_project_begin_transaction` $\rightarrow$ `easyeda_schematic_place_component` $\rightarrow$ `easyeda_schematic_connect_pins_by_net` $\rightarrow$ `easyeda_erc_run` $\rightarrow$ `easyeda_schematic_sync_to_pcb` $\rightarrow$ `easyeda_pcb_place_batch` con coordenadas en mils $\rightarrow$ `easyeda_drc_run`).
+
+---
+
 ## 4. Protocolo de Diagnóstico y Reparación de Errores DRC en EasyEDA Pro
 
 Al interactuar con EasyEDA Pro 3.2.x, el agente debe seguir rigurosamente este protocolo de 4 etapas para diagnosticar y subsanar discrepancias en las reglas de diseño (DRC):

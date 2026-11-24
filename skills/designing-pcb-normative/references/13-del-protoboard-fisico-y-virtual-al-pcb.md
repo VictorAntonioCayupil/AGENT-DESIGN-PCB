@@ -96,3 +96,25 @@ El agente debe explicar pedagógicamente al usuario por qué un circuito que fun
 | **Inductancia de Cables Puente ($L \approx 1\,\text{nH/mm}$)** | Los cables jumpers de $10\text{--}15\,\text{cm}$ introducen hasta $150\,\text{nH}$, deformando las conmutaciones. En el PCB los capacitores de desacoplo van a menos de $1\,\text{mm}$ del pin del IC sobre un plano GND de bajísima inductancia. |
 | **Cero Protección contra ESD / Transitorios** | El protoboard no tiene diodos TVS ni planos de dispersión de carga; en el PCB se colocan supresores **IEC 61000-4-2** en cada conector de borde. |
 | **Módulos de Desarrollo Voluminosos** | En el PCB se reemplaza el módulo de desarrollo completo por el chip autónomo montado en superficie (SMD) con su cristal oscilador y antena diseñada bajo norma, reduciendo costo y tamaño hasta un $80\%$. |
+
+---
+
+## 6. PCB de Conexión Interactivo, Política de Cero Invención y Creación en EasyEDA Pro
+
+A partir de la versión **v4.2**, el flujo de prototipado se eleva a un **PCB de Conexión Interactivo** ([`templates/PCB-CONNECTION-WORKBENCH.template.html`](../templates/PCB-CONNECTION-WORKBENCH.template.html)) que combina obtención real de *pinouts*, posicionamiento físico 2D y simulación eléctrica con cálculos reales:
+
+### 6.1. Regla de Bloqueo por Ficha Técnica (*Datasheet-First / Hard-Stop Gate*)
+1. **Ningún equipo se dibuja ni se cablea por suposición:** Cada módulo, sensor, relé o conector debe registrar su fuente de ficha técnica (`datasheet_source`) y lista exacta de pines (`number`, `name`, `type`, `voltage_v`, `max_current_ma`, `tolerant_5v`).
+2. **Si el agente tiene duda sobre un componente:**
+   * Marca el equipo como `datasheet_verified: false` (**BLOQUEADO — SIN FICHA**).
+   * **DETIENE el diseño** y solicita al usuario el PDF del datasheet, enlace oficial del fabricante, código LCSC o fotografía nítida de la serigrafía del módulo.
+3. **Solo procede cuando entiende el 100 %:** La promoción hacia EasyEDA Pro permanece bloqueada hasta que `pcb_verify_connection_board` devuelva `status: "APPROVED_FOR_EASYEDA"` y el usuario apruebe la ubicación física de los componentes.
+
+### 6.2. Posicionamiento Interactivo y Pipeline hacia EasyEDA Pro
+1. **Posicionamiento en Lienzo Real (Drag & Drop):** El usuario y el agente ajustan las coordenadas $(X, Y)$ en milímetros y la rotación ($0^\circ/90^\circ/180^\circ/270^\circ$) de cada equipo sobre el contorno `BoardOutline`, verificando en vivo **0 colisiones de *courtyard***.
+2. **Simulación Operativa con Valores Reales:** Se validan corrientes reales ($I = (V - V_f)/R$), potencias ($P = I^2 R$), niveles lógicos y ancho mínimo **IPC-2221** antes de tocar el CAD.
+3. **Ejecución Transaccional en EasyEDA Pro:**
+   * `pcb_verify_connection_board` (en `agent-design-pcb`) $\rightarrow$ genera `easyeda_integration_pipeline` y las coordenadas exactas en **mils**.
+   * `easyeda_project_begin_transaction` $\rightarrow$ `easyeda_catalog_verify_device` $\rightarrow$ `easyeda_schematic_place_component` + `easyeda_schematic_connect_pins_by_net`.
+   * `easyeda_erc_run` (0 errores) $\rightarrow$ `easyeda_schematic_sync_to_pcb` $\rightarrow$ `easyeda_pcb_place_batch` (aplicando el posicionamiento exacto del PCB de Conexión).
+   * Ruteo normativo, reconstrucción de planos GND (`Shift+B`) y `easyeda_drc_run` (0 errores).

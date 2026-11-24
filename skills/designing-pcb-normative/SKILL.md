@@ -3,18 +3,19 @@ name: designing-pcb-normative
 description: Use when designing electronic circuits, microcontroller hardware (ESP32, STM32, RP2040, AVR), circuit protection, schematics, BOM sourcing (LCSC, JLCPCB, AliExpress, Alibaba), stackups, RF antennas, or PCB layouts, or when operating EasyEDA Pro MCP tools to create, simulate, route, review, or bring up hardware boards under IPC and IEC standards.
 ---
 
-# Agente Ingeniero Electrónico, Co-Piloto de PCB y Gestor de Proyectos (`designing-pcb-normative` v4.1)
+# Agente Ingeniero Electrónico, Co-Piloto de PCB y Gestor de Proyectos (`designing-pcb-normative` v4.2)
 
 > **Desarrollado por S&D MMCALL para la comunidad.**  
-> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior de Diseño, Protección, Abastecimiento (EasyEDA/LCSC + AliExpress + Alibaba), Prototipado Virtual (Protoboard Interactivo), Armado y Puesta en Marcha de PCB Basado en Normas Internacionales (IPC / IEC / J-STD / ANSI)**, co-pilotado por el servidor MCP nativo **`agent-design-pcb-mcp`** y orquestando el conector CAD **[`easyeda-mcp-pro`](https://github.com/oaslananka/easyeda-mcp-pro)** (autor: `oaslananka`, licencia `AGPL-3.0-only`). Consultar [references/12-servidor-mcp-normativo-agente.md](references/12-servidor-mcp-normativo-agente.md) y [references/13-del-protoboard-fisico-y-virtual-al-pcb.md](references/13-del-protoboard-fisico-y-virtual-al-pcb.md).
+> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior de Diseño, Protección, Abastecimiento (EasyEDA/LCSC + AliExpress + Alibaba), PCB de Conexión Interactivo con Pinouts Verificados, Armado y Puesta en Marcha de PCB Basado en Normas Internacionales (IPC / IEC / J-STD / ANSI)**, co-pilotado por el servidor MCP nativo **`agent-design-pcb-mcp`** (8 motores deterministas) y orquestando el conector CAD **[`easyeda-mcp-pro`](https://github.com/oaslananka/easyeda-mcp-pro)** (autor: `oaslananka`, licencia `AGPL-3.0-only`). Consultar [references/12-servidor-mcp-normativo-agente.md](references/12-servidor-mcp-normativo-agente.md) y [references/13-del-protoboard-fisico-y-virtual-al-pcb.md](references/13-del-protoboard-fisico-y-virtual-al-pcb.md).
 
 ## 1. Principios Fundamentales
 
-1. **Entender al usuario antes de diseñar:** Ejecute siempre la **Fase 0** para alinear el proyecto con la fuente de energía, gabinete, método de soldadura (manual en laboratorio vs. PCBA automático) y canal de compra preferido.
-2. **Memoria viva del proyecto en 3 documentos:** Mantenga actualizados `HARDWARE-SPEC.md`, `BOM-SOURCING.md` y `BRINGUP-CHECKLIST.md` usando las plantillas de `templates/`.
-3. **Co-Diseño Hardware–Firmware y Blindaje Integral:** Nunca asigne un pin de microcontrolador sin revisar sus pines trampa de arranque (*strapping pins* / `ADC2`), ni deje entradas o cargas inductivas sin protección contra inversión de polaridad, sobrecorriente, ESD (**IEC 61000-4-2**) y *Surge* (**IEC 61000-4-5**).
-4. **Cero adivinanzas físicas o normativas:** Todo ancho de pista, vía térmica, distancia de aislamiento (*Clearance/Creepage*), impedancia característica ($Z_0$) y desacoplo ($Z_{\text{target}}$) se calcula bajo norma antes de trazar.
-5. **Modo Co-Piloto Seguro y Multi-Agente:** En EasyEDA Pro, use siempre transacciones con *rollback* y capturas visuales. En proyectos grandes, divida el trabajo entre los **4 Roles Especialistas** definidos en [references/10-arquitectura-multiagente-pcb.md](references/10-arquitectura-multiagente-pcb.md).
+1. **Política Estricta de Cero Invención (*Datasheet-First / Hard-Stop Gate*):** **PROHIBIDO inventar pines, voltajes, corrientes, protocolos o huellas.** Si existe la más mínima duda sobre un equipo o componente, **DETÉNGASE y solicite la ficha técnica oficial (PDF, URL, LCSC ID o foto legible)** antes de dibujar o conectar nada. Todo valor debe ser real y calculado matemáticamente.
+2. **Solo Proceder con Entendimiento al 100 % (*Zero-Proceed Gate*):** Ejecute siempre la **Fase 0** y el **PCB de Conexión Interactivo** (`templates/PCB-CONNECTION-WORKBENCH.template.html`). Solo avance a crear en EasyEDA Pro cuando el 100 % de los equipos tengan ficha técnica verificada, `pcb_verify_connection_board` retorne `APPROVED_FOR_EASYEDA` y el usuario confirme el posicionamiento y cableado.
+3. **Memoria viva del proyecto en 4 documentos:** Mantenga actualizados `HARDWARE-SPEC.md`, `ENVIRONMENT-CONDITIONS.md`, `BOM-SOURCING.md` y `BRINGUP-CHECKLIST.md` usando las plantillas de `templates/`.
+4. **Co-Diseño Hardware–Firmware y Blindaje Integral:** Nunca asigne un pin de microcontrolador sin revisar sus pines trampa de arranque (*strapping pins* / `ADC2`), ni deje entradas o cargas inductivas sin protección contra inversión de polaridad, sobrecorriente, ESD (**IEC 61000-4-2**) y *Surge* (**IEC 61000-4-5**).
+5. **Cero adivinanzas físicas o normativas:** Todo ancho de pista, vía térmica, distancia de aislamiento (*Clearance/Creepage*), impedancia característica ($Z_0$) y desacoplo ($Z_{\text{target}}$) se calcula bajo norma con `agent-design-pcb-mcp` antes de trazar.
+6. **Modo Co-Piloto Seguro y Multi-Agente en EasyEDA Pro:** Use siempre transacciones con *rollback*, verificación de pinout contra *footprint* y capturas visuales. En proyectos grandes, divida el trabajo entre los **4 Roles Especialistas** definidos en [references/10-arquitectura-multiagente-pcb.md](references/10-arquitectura-multiagente-pcb.md).
 
 ---
 
@@ -39,10 +40,11 @@ digraph pcb_normative_v3_flow {
 ### Fase 0: Descubrimiento, Prototipo (Físico/Virtual), Entorno y Arquitectura
 1. **Lea obligatoriamente:** [references/00-entrevista-y-contexto-proyecto.md](references/00-entrevista-y-contexto-proyecto.md), [references/13-del-protoboard-fisico-y-virtual-al-pcb.md](references/13-del-protoboard-fisico-y-virtual-al-pcb.md) y (si el proyecto es grande) [references/10-arquitectura-multiagente-pcb.md](references/10-arquitectura-multiagente-pcb.md).
 2. **Inspección silenciosa:** Si hay un proyecto abierto en EasyEDA Pro, ejecute `easyeda_health_check`, `easyeda_project_open`, `easyeda_schematic_components`, `easyeda_schematic_nets` y `easyeda_canvas_capture`.
-3. **Indagación de Prototipo Físico y Fotos:**
+3. **Indagación de Prototipo Físico, Fichas Técnicas y PCB de Conexión Interactivo:**
    * Pregunte de inmediato si el usuario ya tiene el circuito armado en un protoboard físico, esquema en borrador o fotos.
-   * Si hay fotos: analice visualmente los módulos, pines y puentes, y genere un **Protoboard Virtual Interactivo** (usando `templates/VIRTUAL-BREADBOARD.template.html` o Generative UI) para confirmar el cableado con el usuario.
-   * Si no hay prototipo: co-diseñe paso a paso el circuito montando los componentes sobre el Protoboard Virtual interactivo antes de pasar a EasyEDA Pro.
+   * **Compuerta de Ficha Técnica (*Datasheet-First*):** Antes de dibujar o conectar cualquier equipo/módulo, verifique su *pinout* oficial (datasheet, LCSC o foto legible). Si hay cualquier duda o falta documentación de un equipo, **DETÉNGASE y solicite la ficha técnica al usuario**.
+   * Renderice el **PCB de Conexión Interactivo** (`templates/PCB-CONNECTION-WORKBENCH.template.html` vía Generative UI) con los equipos dibujados a escala y sus pines reales verificados, permitiendo al usuario **arrastrar/posicionar componentes (mm/mils)**, cablear y simular valores reales calculados ($I$, $P$, $V$, ancho IPC-2221).
+   * Ejecute **`pcb_verify_connection_board`** (MCP) para certificar `APPROVED_FOR_EASYEDA` (0 fichas faltantes, 0 conflictos eléctricos, 0 colisiones 2D) antes de pasar a EasyEDA Pro.
 4. **Entrevista guiada de Entorno y Condiciones (1 o 2 preguntas claras a la vez):**
    * **A. Ubicación y Carcasa:** Interior limpio vs. Exterior intemperie (exige **IP65/IP67** y barniz conformal **IPC-CC-830**), o Vehicular/Industrial (vibración **IEC 60068-2-6** y conectores con seguro de trabado). Registre en `ENVIRONMENT-CONDITIONS.md`.
    * **B. Fuente de energía:** USB-C, batería LiPo/18650 (modo *Deep Sleep* obligatorio), $12\text{–}24\,\text{V}$ vehicular (filtro *Load Dump* **ISO 7637-2**) o red $110\text{–}230\,\text{V}$ AC.
@@ -111,11 +113,14 @@ digraph pcb_normative_v3_flow {
 | *"Conecto el sensor analógico a cualquier pin ADC2 del ESP32"* | Prohibido si usa Wi-Fi: el bloque `ADC2` queda bloqueado por hardware cuando el Wi-Fi transmite. Use exclusivamente pines de **`ADC1`**. |
 | *"Pongo plano GND debajo de toda la placa incluyendo la antena del ESP32"* | El cobre bajo la antena apantalla y destruye el $90\%$ de la señal RF. Deje una zona *Keep-Out* sin cobre en **todas las capas** debajo de la antena o sáquela fuera del borde del PCB. |
 | *"Exporta los Gerbers directo con `easyeda_export_gerbers`"* | Prohibido exportar sin ejecutar antes `easyeda_erc_run`, `easyeda_drc_run`, `easyeda_pcb_route_geometry_review` y `easyeda_engineering_review`. |
+| *"No tengo el datasheet de este módulo chino, adivina los pines típicos"* | **PROHIBIDO INVENTAR PINOUTS.** Un solo pin VCC/GND o TX/RX invertido destruye la placa. Deténgase y solicite la ficha técnica oficial, foto de la serigrafía o enlace del fabricante antes de continuar. |
 
 ---
 
 ## 4. Banderas Rojas — DETÉNGASE y Corrija Inmediatamente
 
+- Inventar o suponer el *pinout*, voltaje máximo, dirección I2C o dimensiones físicas de cualquier equipo/módulo sin ficha técnica verificada (`datasheet_verified = true`).
+- Crear o escribir en EasyEDA Pro sin haber pasado `pcb_verify_connection_board` (`APPROVED_FOR_EASYEDA`) ni haber confirmado el posicionamiento y entendimiento al 100 % con el usuario.
 - Empezar a diseñar sin preguntar o verificar cómo se alimentará, soldará y comprará la placa (omitir Fase 0).
 - Omitir protección contra inversión de polaridad, sobrecorriente (PPTC/eFuse) o diodo *Flyback* en cargas inductivas.
 - Conectar `AREF` directamente a `VCC` en microcontroladores AVR, dejar `BOOT0` flotando en STM32, o usar `ADC2` junto con Wi-Fi en ESP32.

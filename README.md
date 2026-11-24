@@ -43,13 +43,14 @@
 | **Manual 09 — Simulación, DFT y *Bring-Up*** | Simulación SPICE en EasyEDA Pro, puntos de prueba (`TP`) obligatorios, puentes de aislamiento de $0\,\Omega$ y protocolo de encendido seguro en laboratorio. | [09-simulacion-dft-bringup-laboratorio.md](skills/designing-pcb-normative/references/09-simulacion-dft-bringup-laboratorio.md) |
 | **Manual 10 — Arquitectura Multi-Agente** | Orquestación de 4 roles especialistas (Arquitecto de Circuito/MCU, Gestor de Compras, Ingeniero de Layout/EMC y Auditor DFM/Laboratorio). | [10-arquitectura-multiagente-pcb.md](skills/designing-pcb-normative/references/10-arquitectura-multiagente-pcb.md) |
 | **Manual 11 — Guía Operativa Oficial del Editor EasyEDA** | Reglas oficiales del lienzo EasyEDA (eje $Y$ invertido, errores de *Convert to PCB*, correspondencia Pin/Pad `1,2` vs `A,C`, regiones `No Solid` y `Board Cutout`, reconstrucción de cobre `Shift+B` y anatomía de archivos Gerber `.GKO`/`.DRL`). | [11-guia-operativa-editor-easyeda.md](skills/designing-pcb-normative/references/11-guia-operativa-editor-easyeda.md) |
-| **Manual 12 — Servidor MCP Normativo del Agente** | Especificación técnica de las 7 herramientas MCP del agente (`pcb_normative_*`), protocolo de resolución atómica de DRC en EasyEDA Pro y configuración de entorno. | [12-servidor-mcp-normativo-agente.md](skills/designing-pcb-normative/references/12-servidor-mcp-normativo-agente.md) |
-| **Manual 13 — Del Protoboard al PCB Profesional** | Metodología de co-diseño: análisis visual de fotos/armado físico, simulador de Protoboard Virtual interactivo, auditoría de entorno (IP65, vibración, cables largos) y salto normativo al PCB. | [13-del-protoboard-fisico-y-virtual-al-pcb.md](skills/designing-pcb-normative/references/13-del-protoboard-fisico-y-virtual-al-pcb.md) |
+| **Manual 12 — Servidor MCP Normativo del Agente** | Especificación técnica de las 8 herramientas MCP del agente (`pcb_normative_*` y `pcb_verify_connection_board`), compuerta *Datasheet-First* y resolución atómica de DRC en EasyEDA Pro. | [12-servidor-mcp-normativo-agente.md](skills/designing-pcb-normative/references/12-servidor-mcp-normativo-agente.md) |
+| **Manual 13 — Del Protoboard al PCB Profesional** | Metodología de co-diseño: política de cero invención (*Datasheet-First*), PCB de Conexión Interactivo con posicionamiento Drag & Drop, simulación real y promoción a EasyEDA Pro. | [13-del-protoboard-fisico-y-virtual-al-pcb.md](skills/designing-pcb-normative/references/13-del-protoboard-fisico-y-virtual-al-pcb.md) |
 | **Plantilla 1 — Ficha Técnica Viva** | Documento persistente de arquitectura, árbol de potencia, *pinout*, *stackup* y estado de avance del proyecto. | [HARDWARE-SPEC.template.md](skills/designing-pcb-normative/templates/HARDWARE-SPEC.template.md) |
 | **Plantilla 2 — Matriz de Compras y Proveedores** | Comparativa de componentes entre LCSC (`Basic/Extended`), AliExpress y Alibaba con evaluación de rating, envío, MOQ y riesgo de falsificación. | [BOM-SOURCING.template.md](skills/designing-pcb-normative/templates/BOM-SOURCING.template.md) |
 | **Plantilla 3 — Checklist de *Bring-Up* en Banco** | Registro paso a paso de pruebas en frío ($\Omega$), primer encendido con fuente limitada, medición de rieles y validación de periféricos. | [BRINGUP-CHECKLIST.template.md](skills/designing-pcb-normative/templates/BRINGUP-CHECKLIST.template.md) |
 | **Plantilla 4 — Contexto y Condiciones de Entorno** | Registro normativo de ubicación (IP rating), rango térmico, vibración (**IEC 60068-2-6**), transitorios vehiculares (**ISO 7637**) y cables largos. | [ENVIRONMENT-CONDITIONS.template.md](skills/designing-pcb-normative/templates/ENVIRONMENT-CONDITIONS.template.md) |
-| **Plantilla 5 — Protoboard Virtual Interactivo** | Simulador y visualizador interactivo en HTML5/Tailwind para montar componentes, simular conexiones y auditar reglas antes de rutear el PCB. | [VIRTUAL-BREADBOARD.template.html](skills/designing-pcb-normative/templates/VIRTUAL-BREADBOARD.template.html) |
+| **Plantilla 5 — Protoboard Virtual Interactivo** | Visualizador de protoboard preliminar en HTML5/Tailwind para prototipado rápido en banco. | [VIRTUAL-BREADBOARD.template.html](skills/designing-pcb-normative/templates/VIRTUAL-BREADBOARD.template.html) |
+| **Plantilla 6 — PCB de Conexión Interactivo (v4.2)** | Workbench PCB interactivo: dibujo de pinouts verificados, posicionamiento Drag & Drop en mm/mils, simulación eléctrica con valores reales, bloqueo por falta de datasheet y exportación JSON para EasyEDA Pro. | [PCB-CONNECTION-WORKBENCH.template.html](skills/designing-pcb-normative/templates/PCB-CONNECTION-WORKBENCH.template.html) |
 
 ---
 
@@ -66,17 +67,18 @@ AGENT-DESIGN-PCB/
 │   ├── easyeda-bridge-extension.eext                   # Paquete oficial .eext para importar en EasyEDA Pro
 │   └── easyeda-bridge-extension.checksums.json         # Checksums SHA-256 de verificación
 ├── mcp-server/                                         # Servidor MCP Normativo Desarrollado por S&D MMCALL
-│   ├── agent_design_pcb_mcp.py                         # Servidor stdio JSON-RPC 2.0 con 7 herramientas IPC/IEC
+│   ├── agent_design_pcb_mcp.py                         # Servidor stdio JSON-RPC 2.0 con 8 herramientas IPC/IEC
 │   └── test_mcp_and_easyeda_live.py                    # Suite de pruebas automatizadas y diagnóstico de placa
 └── skills/
     └── designing-pcb-normative/                        # Skill para el agente de IA
-        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.1)
-        ├── templates/                                  # Plantillas Markdown normalizadas
+        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.2)
+        ├── templates/                                  # Plantillas Markdown y HTML interactivas
         │   ├── HARDWARE-SPEC.template.md               # Memoria viva del hardware
         │   ├── BOM-SOURCING.template.md                # Matriz de compras (LCSC / AliExpress / Alibaba)
         │   ├── BRINGUP-CHECKLIST.template.md           # Puesta en marcha en banco de pruebas
         │   ├── ENVIRONMENT-CONDITIONS.template.md      # Contexto y condiciones de entorno (IP, temperatura, cables)
-        │   └── VIRTUAL-BREADBOARD.template.html        # Simulador de Protoboard Virtual interactivo (HTML5)
+        │   ├── VIRTUAL-BREADBOARD.template.html        # Protoboard Virtual preliminar (HTML5)
+        │   └── PCB-CONNECTION-WORKBENCH.template.html  # PCB de Conexión Interactivo con Pinouts & EasyEDA JSON
         └── references/                                 # 14 Manuales técnicos normativos (00 a 13)
             ├── 00-entrevista-y-contexto-proyecto.md
             ├── 01-esquematico-pdn-esd.md

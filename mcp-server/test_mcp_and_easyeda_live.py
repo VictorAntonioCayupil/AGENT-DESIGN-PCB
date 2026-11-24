@@ -54,6 +54,73 @@ def test_normative_calculators() -> None:
     assert mcu_bad["passed"] is False, "Debería detectar que GPIO21 en ESP32-C6 no es LP-IO para despertar de Deep Sleep"
     print(f"  [OK] MCU Validator (XIAO-ESP32-C6): detectó correctamente error LP-IO -> {mcu_bad['blocking_errors'][0]}")
 
+    # 1.7 Connection Board Datasheet-First Gate (Bloqueo sin ficha técnica y aprobación con ficha verificada)
+    dev_u1 = {
+        "designator": "U1",
+        "name": "XIAO ESP32-C6",
+        "datasheet_verified": True,
+        "datasheet_source": "Seeed XIAO ESP32-C6 Official Datasheet",
+        "x_mm": 25.0,
+        "y_mm": 40.0,
+        "width_mm": 21.0,
+        "height_mm": 30.0,
+        "pins": [
+            {"number": "1", "name": "3V3", "type": "power_out", "voltage_v": 3.3, "max_current_ma": 500},
+            {"number": "2", "name": "GND", "type": "gnd", "voltage_v": 0.0, "max_current_ma": 1000},
+            {"number": "3", "name": "D4", "type": "i2c", "voltage_v": 3.3, "max_current_ma": 20, "tolerant_5v": False},
+        ],
+    }
+    dev_missing_ds = {
+        "designator": "M2",
+        "name": "Modulo Sin Datasheet",
+        "datasheet_verified": False,
+        "datasheet_source": "",
+        "x_mm": 75.0,
+        "y_mm": 40.0,
+        "width_mm": 20.0,
+        "height_mm": 20.0,
+        "pins": [{"number": "1", "name": "VCC", "type": "power_in", "voltage_v": 3.3}],
+    }
+    gate_blocked = mcp.verify_connection_board(
+        board_width_mm=120.0,
+        board_height_mm=84.0,
+        devices=[dev_u1, dev_missing_ds],
+        connections=[],
+    )
+    assert gate_blocked["can_proceed_to_easyeda"] is False
+    assert len(gate_blocked["missing_datasheets"]) == 1
+    print("  [OK] Datasheet-First Gate: bloqueó correctamente equipo sin ficha técnica verificada.")
+
+    dev_m1_ok = {
+        "designator": "M1",
+        "name": "BME280",
+        "datasheet_verified": True,
+        "datasheet_source": "Bosch BST-BME280-DS002",
+        "x_mm": 75.0,
+        "y_mm": 40.0,
+        "width_mm": 18.0,
+        "height_mm": 18.0,
+        "pins": [
+            {"number": "1", "name": "VIN", "type": "power_in", "voltage_v": 3.3, "max_current_ma": 10},
+            {"number": "2", "name": "GND", "type": "gnd", "voltage_v": 0.0, "max_current_ma": 10},
+            {"number": "3", "name": "SDA", "type": "i2c", "voltage_v": 3.3, "max_current_ma": 5},
+        ],
+    }
+    gate_ok = mcp.verify_connection_board(
+        board_width_mm=120.0,
+        board_height_mm=84.0,
+        devices=[dev_u1, dev_m1_ok],
+        connections=[
+            {"net": "+3V3", "from_device": "U1", "from_pin": "1", "to_device": "M1", "to_pin": "1"},
+            {"net": "GND", "from_device": "U1", "from_pin": "2", "to_device": "M1", "to_pin": "2"},
+            {"net": "I2C_SDA", "from_device": "U1", "from_pin": "3", "to_device": "M1", "to_pin": "3"},
+        ],
+    )
+    assert gate_ok["can_proceed_to_easyeda"] is True
+    assert gate_ok["status"] == "APPROVED_FOR_EASYEDA"
+    assert len(gate_ok["easyeda_integration_pipeline"]) == 6
+    print("  [OK] Datasheet-First Gate: aprobó tablero verificado y emitió pipeline de 6 pasos para EasyEDA Pro.")
+
 
 def test_stdio_jsonrpc_protocol() -> None:
     print("\n=== 2. Probando Protocolo MCP JSON-RPC 2.0 sobre STDIO ===")

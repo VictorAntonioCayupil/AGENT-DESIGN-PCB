@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PCB de Conexión Interactivo — AGENT-DESIGN-PCB v4.2</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    .pcb-grid {
+      background-color: #0b2419;
+      background-image:
+        linear-gradient(to right, rgba(52, 211, 153, 0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(52, 211, 153, 0.12) 1px, transparent 1px);
+      background-size: 20px 20px; /* 5 mm por cuadro (4 px/mm) */
+    }
+    .pin-dot {
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .pin-dot:hover {
+      transform: scale(1.35);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.9);
+    }
+    .pin-selected {
+      transform: scale(1.45);
+      box-shadow: 0 0 10px #facc15 !important;
+      outline: 2px solid #facc15;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 p-3 select-none">
+
+  <!-- Barra Superior -->
+  <header class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-800">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">S&amp;D MMCALL</span>
+        <h1 class="text-base font-bold text-white">PCB de Conexión, Pinout Verificado y Simulador Operativo</h1>
+        <span class="px-2 py-0.5 text-xs font-mono bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded">v4.2</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-0.5">
+        Arrastra equipos para posicionar en el PCB, haz clic en 2 pines para cablear, opera los controles con cálculos reales y valida fichas técnicas antes de pasar a EasyEDA Pro.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button onclick="openAddDeviceModal()" class="px-2.5 py-1.5 text-xs font-semibold rounded bg-amber-600 hover:bg-amber-500 text-white cursor-pointer">
+        + Equipo / Pinout
+      </button>
+      <button onclick="toggleWiringMode()" id="btnWireMode" class="px-2.5 py-1.5 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 cursor-pointer">
+        Modo Cableado: OFF
+      </button>
+      <button onclick="exportEasyEdaJson()" id="btnPromote" class="px-3 py-1.5 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer">
+        Promover a EasyEDA Pro
+      </button>
+    </div>
+  </header>
+
+  <!-- Layout Principal -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+
+    <!-- Panel Izquierdo: Controles de Simulación Real y Catálogo (3 cols) -->
+    <aside class="xl:col-span-3 space-y-3">
+
+      <!-- Estado de Compuerta Datasheet-First -->
+      <div id="gateCard" class="p-3 rounded-lg border bg-slate-900 border-slate-800">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Compuerta Cero Invención</span>
+          <span id="gateBadge" class="text-xs px-2 py-0.5 rounded font-semibold"></span>
+        </div>
+        <div id="gateMessages" class="space-y-1.5 text-xs"></div>
+      </div>
+
+      <!-- Simulador Operativo con Cálculos Reales -->
+      <div class="p-3 rounded-lg border bg-slate-900 border-slate-800 space-y-2.5">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-emerald-400">Simulación Eléctrica Real</h2>
+
+        <div class="text-xs space-y-2">
+          <div>
+            <div class="flex justify-between text-slate-300 mb-0.5">
+              <label for="vSupply">Tensión Batería / Fuente (V<sub>in</sub>)</label>
+              <span id="vSupplyVal" class="font-mono text-emerald-300">3.70 V</span>
+            </div>
+            <input id="vSupply" type="range" min="3.0" max="5.2" step="0.1" value="3.7" oninput="recalculateAll()" class="w-full accent-emerald-500 cursor-pointer" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-slate-300 mb-0.5">
+              <label for="rLedInput">Resistor Limitador R1 (&Omega;)</label>
+              <span id="rLedVal" class="font-mono text-sky-300">330 &Omega;</span>
+            </div>
+            <input id="rLedInput" type="range" min="47" max="1000" step="10" value="330" oninput="recalculateAll()" class="w-full accent-sky-500 cursor-pointer" />
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-slate-300">Estado Pulsador BTN (LP-IO0):</span>
+            <button id="btnSimPress" onclick="toggleButtonSim()" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 border border-slate-600 text-slate-200 cursor-pointer">
+              SUELTO (HIGH 3.3V)
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <span class="text-slate-300">Salida MCU GPIO21 (LED):</span>
+            <button id="btnGpioToggle" onclick="toggleGpioSim()" class="px-2.5 py-1 rounded text-xs font-semibold bg-emerald-600 text-white cursor-pointer">
+              ACTIVA (3.3V)
+            </button>
+          </div>
+        </div>
+
+        <!-- Telemetría Calculada Real -->
+        <div class="pt-2 border-t border-slate-800 grid grid-cols-2 gap-1.5 text-xs font-mono">
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <span class="text-slate-400 block text-[11px]">I<sub>LED</sub> Calculada</span>
+            <span id="calcILed" class="text-emerald-400 font-bold">0.00 mA</span>
+          </div>
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <span class="text-slate-400 block text-[11px]">P<sub>R1</sub> Disipada</span>
+            <span id="calcPR1" class="text-sky-400 font-bold">0.00 mW</span>
+          </div>
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <span class="text-slate-400 block text-[11px]">I<sub>Total</sub> Est.</span>
+            <span id="calcITotal" class="text-amber-300 font-bold">0.00 mA</span>
+          </div>
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <span class="text-slate-400 block text-[11px]">Ancho IPC-2221</span>
+            <span id="calcIpcWidth" class="text-purple-300 font-bold">0.25 mm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inspector del Equipo Seleccionado -->
+      <div class="p-3 rounded-lg border bg-slate-900 border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400">Inspector de Pinout y Posición</h2>
+          <button onclick="rotateSelected()" class="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-slate-200 cursor-pointer">Rotar 90°</button>
+        </div>
+        <div id="inspectorBody" class="text-xs text-slate-300 space-y-1.5">
+          Selecciona un equipo en el PCB para ver su ficha técnica, coordenadas exactas (mm / mil) y tabla de pines.
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Lienzo Central: PCB de Conexión Interactivo (6 cols) -->
+    <main class="xl:col-span-6 space-y-3">
+      <div class="p-3 rounded-lg border bg-slate-900 border-slate-800">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-emerald-300">PCB: 120 mm &times; 84 mm</span>
+            <span class="text-slate-500">|</span>
+            <span class="text-slate-400">Escala: 4 px = 1 mm (Grilla = 5 mm)</span>
+          </div>
+          <div id="wiringHint" class="text-xs text-slate-400">
+            Arrastra cualquier equipo para posicionarlo.
+          </div>
+        </div>
+
+        <!-- Contenedor del PCB a escala real (100mm x 70mm -> 400px x 280px, escalable) -->
+        <div class="overflow-x-auto flex justify-center bg-slate-950 p-3 rounded border border-slate-800">
+          <div id="pcbCanvas" class="pcb-grid relative border-2 border-amber-400/80 rounded shadow-inner" style="width: 480px; height: 336px;">
+            <!-- Etiqueta de dimensiones -->
+            <div class="absolute -top-2.5 left-2 px-1 bg-slate-950 text-[11px] font-mono text-amber-300">BoardOutline (120 mm &times; 84 mm)</div>
+            <!-- Capa SVG para pistas / conexiones reales -->
+            <svg id="wiresSvg" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+            <!-- Capa de equipos montados -->
+            <div id="devicesLayer" class="absolute inset-0 z-20"></div>
+          </div>
+        </div>
+
+        <!-- Leyenda de colores de red -->
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 font-mono">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Alimentación (+V)</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> GND</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> I2C / Bus</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> GPIO / Señal</span>
+          </div>
+          <span id="collisionBadge" class="text-emerald-400">0 Colisiones 2D</span>
+        </div>
+      </div>
+
+      <!-- Tabla de Netlist Verificado -->
+      <div class="p-3 rounded-lg border bg-slate-900 border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Conexiones Activas (Netlist Real)</h2>
+          <span id="netCountBadge" class="text-xs font-mono text-slate-400">0 conexiones</span>
+        </div>
+        <div id="connectionsTable" class="space-y-1 max-h-40 overflow-y-auto text-xs font-mono"></div>
+      </div>
+    </main>
+
+    <!-- Panel Derecho: EasyEDA Pro Pipeline y Exportación (3 cols) -->
+    <aside class="xl:col-span-3 space-y-3">
+      <div class="p-3 rounded-lg border bg-slate-900 border-slate-800">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2">Integración EasyEDA Pro</h2>
+        <ol class="space-y-1.5 text-xs text-slate-300 list-decimal list-inside">
+          <li>Verificar 100% de fichas técnicas (cero pines inventados).</li>
+          <li>Validar niveles eléctricos y 0 colisiones 2D.</li>
+          <li>Ejecutar <code class="text-emerald-300">pcb_verify_connection_board</code> (MCP).</li>
+          <li>Abrir transacción <code class="text-sky-300">easyeda_project_begin_transaction</code>.</li>
+          <li>Colocar símbolos y conectar nets con <code class="text-sky-300">easyeda_schematic_connect_pins_by_net</code>.</li>
+          <li>Aplicar posiciones en mils con <code class="text-sky-300">easyeda_pcb_place_batch</code>.</li>
+        </ol>
+      </div>
+
+      <div class="p-3 rounded-lg border bg-slate-900 border-slate-800">
+        <div class="flex items-center justify-between mb-1.5">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Payload JSON (EasyEDA / MCP)</h2>
+          <button onclick="copyExportJson()" class="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-slate-200 cursor-pointer">Copiar</button>
+        </div>
+        <textarea id="exportJsonBox" readonly rows="15" class="w-full bg-slate-950 border border-slate-800 rounded p-2 text-[11px] font-mono text-emerald-300 focus:outline-none"></textarea>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Modal para Agregar Equipo (Con o Sin Ficha Técnica) -->
+  <div id="addModal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-lg max-w-md w-full p-4 space-y-3 text-xs">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white">Agregar Equipo al PCB de Conexión</h3>
+        <button onclick="closeAddDeviceModal()" class="text-slate-400 hover:text-white cursor-pointer">&times;</button>
+      </div>
+
+      <div class="space-y-2">
+        <div>
+          <label class="block text-slate-400 mb-1">Preset Rápido o Equipo Nuevo:</label>
+          <select id="modalPreset" onchange="applyModalPreset()" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200">
+            <option value="custom_unverified">Equipo sin ficha técnica (Prueba de Bloqueo)</option>
+            <option value="relay_5v">Módulo Relé 5V Optoacoplado (Ficha Verificada)</option>
+            <option value="uart_gps">Módulo GPS NEO-6M UART 3.3V (Ficha Verificada)</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-400 mb-1">Designador (ej. M2, U2)</label>
+            <input id="modalDes" type="text" value="M2" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-white" />
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Nombre del Equipo</label>
+            <input id="modalName" type="text" value="Sensor Desconocido XYZ" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-white" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">Fuente de Ficha Técnica (Datasheet / LCSC / URL)</label>
+          <input id="modalSource" type="text" placeholder="Vacío = BLOQUEA avance y solicita ficha técnica" value="" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-white" />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeAddDeviceModal()" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300 cursor-pointer">Cancelar</button>
+        <button onclick="confirmAddDevice()" class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold cursor-pointer">Montar en PCB</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PX_PER_MM = 4; // 120mm x 84mm = 480px x 336px
+    const BOARD_W_MM = 120;
+    const BOARD_H_MM = 84;
+    const MM_TO_MIL = 39.37007874;
+
+    let wiringMode = false;
+    let selectedPinRef = null; // { deviceId, pinNum }
+    let selectedDeviceId = "U1";
+    let simButtonPressed = false;
+    let simGpioHigh = true;
+
+    // Equipos iniciales con PINOUT REAL VERIFICADO de hoja de datos
+    let devices = [
+      {
+        designator: "U1",
+        name: "Seeed XIAO ESP32-C6",
+        datasheet_verified: true,
+        datasheet_source: "Seeed Studio XIAO ESP32-C6 Official Pinout & Espressif ESP32-C6 Datasheet v1.1",
+        x_mm: 24,
+        y_mm: 42,
+        width_mm: 21,
+        height_mm: 30,
+        rotation: 0,
+        color: "#0f172a",
+        border: "#10b981",
+        pins: [
+          { number: "1", name: "D0/LP0", side: "left", type: "gpio", voltage_v: 3.3, max_current_ma: 20, tolerant_5v: false },
+          { number: "2", name: "D4/SDA", side: "left", type: "i2c", voltage_v: 3.3, max_current_ma: 20, tolerant_5v: false },
+          { number: "3", name: "D5/SCL", side: "left", type: "i2c", voltage_v: 3.3, max_current_ma: 20, tolerant_5v: false },
+          { number: "4", name: "D6/IO21", side: "right", type: "gpio_out", voltage_v: 3.3, max_current_ma: 20, tolerant_5v: false },
+          { number: "5", name: "3V3", side: "right", type: "power_out", voltage_v: 3.3, max_current_ma: 500, tolerant_5v: false },
+          { number: "6", name: "GND", side: "right", type: "gnd", voltage_v: 0.0, max_current_ma: 1000, tolerant_5v: false },
+        ],
+      },
+      {
+        designator: "M1",
+        name: "BME280 (I2C)",
+        datasheet_verified: true,
+        datasheet_source: "Bosch Sensortec BST-BME280-DS002 Rev 1.6 (3.3V max, I2C 0x76)",
+        x_mm: 68,
+        y_mm: 24,
+        width_mm: 20,
+        height_mm: 18,
+        rotation: 0,
+        color: "#2e1065",
+        border: "#a855f7",
+        pins: [
+          { number: "1", name: "VIN", side: "left", type: "power_in", voltage_v: 3.3, max_current_ma: 10, tolerant_5v: false },
+          { number: "2", name: "GND", side: "left", type: "gnd", voltage_v: 0.0, max_current_ma: 10, tolerant_5v: false },
+          { number: "3", name: "SCL", side: "right", type: "i2c", voltage_v: 3.3, max_current_ma: 5, tolerant_5v: false },
+          { number: "4", name: "SDA", side: "right", type: "i2c", voltage_v: 3.3, max_current_ma: 5, tolerant_5v: false },
+        ],
+      },
+      {
+        designator: "D1",
+        name: "LED + R1",
+        datasheet_verified: true,
+        datasheet_source: "Kingbright APT1608 Red LED (Vf=2.0V, If_max=20mA) + R1 SMD 0805",
+        x_mm: 96,
+        y_mm: 46,
+        width_mm: 18,
+        height_mm: 14,
+        rotation: 0,
+        color: "#4c0519",
+        border: "#f43f5e",
+        isLed: true,
+        vf_v: 2.0,
+        pins: [
+          { number: "1", name: "ANODE", side: "left", type: "load_in", voltage_v: 3.3, max_current_ma: 20, tolerant_5v: false },
+          { number: "2", name: "CATHODE", side: "right", type: "gnd", voltage_v: 0.0, max_current_ma: 20, tolerant_5v: false },
+        ],
+      },
+      {
+        designator: "SW1",
+        name: "BTN Wake",
+        datasheet_verified: true,
+        datasheet_source: "Tact Switch 6x6mm + Pull-up 10k (LCSC C25804)",
+        x_mm: 64,
+        y_mm: 62,
+        width_mm: 18,
+        height_mm: 14,
+        rotation: 0,
+        color: "#1e293b",
+        border: "#38bdf8",
+        pins: [
+          { number: "1", name: "OUT", side: "left", type: "gpio", voltage_v: 3.3, max_current_ma: 5, tolerant_5v: false },
+          { number: "2", name: "GND", side: "right", type: "gnd", voltage_v: 0.0, max_current_ma: 5, tolerant_5v: false },
+        ],
+      },
+    ];
+
+    let connections = [
+      { net: "+3V3", from_device: "U1", from_pin: "5", to_device: "M1", to_pin: "1" },
+      { net: "GND", from_device: "U1", from_pin: "6", to_device: "M1", to_pin: "2" },
+      { net: "I2C_SDA", from_device: "U1", from_pin: "2", to_device: "M1", to_pin: "4" },
+      { net: "I2C_SCL", from_device: "U1", from_pin: "3", to_device: "M1", to_pin: "3" },
+      { net: "LED_DRV", from_device: "U1", from_pin: "4", to_device: "D1", to_pin: "1" },
+      { net: "GND", from_device: "U1", from_pin: "6", to_device: "D1", to_pin: "2" },
+      { net: "BTN_WAKE", from_device: "U1", from_pin: "1", to_device: "SW1", to_pin: "1" },
+      { net: "GND", from_device: "U1", from_pin: "6", to_device: "SW1", to_pin: "2" },
+    ];
+
+    function getPinCanvasPos(dev, pin) {
+      const leftPins = dev.pins.filter((p) => p.side === "left");
+      const rightPins = dev.pins.filter((p) => p.side === "right");
+      const isLeft = pin.side === "left";
+      const list = isLeft ? leftPins : rightPins;
+      const idx = list.findIndex((p) => p.number === pin.number);
+      const wPx = dev.width_mm * PX_PER_MM;
+      const hPx = dev.height_mm * PX_PER_MM;
+      const topPx = (dev.y_mm - dev.height_mm / 2) * PX_PER_MM;
+      const leftPx = (dev.x_mm - dev.width_mm / 2) * PX_PER_MM;
+      const step = hPx / (list.length + 1);
+      return {
+        x: isLeft ? leftPx : leftPx + wPx,
+        y: topPx + step * (idx + 1),
+      };
+    }
+
+    function getNetColor(netName) {
+      const n = netName.toUpperCase();
+      if (n.includes("3V3") || n.includes("5V") || n.includes("VCC") || n.includes("VIN")) return "#ef4444";
+      if (n.includes("GND")) return "#38bdf8";
+      if (n.includes("I2C") || n.includes("SDA") || n.includes("SCL")) return "#34d399";
+      return "#facc15";
+    }
+
+    function renderBoard() {
+      const layer = document.getElementById("devicesLayer");
+      layer.innerHTML = "";
+
+      devices.forEach((dev) => {
+        const wPx = dev.width_mm * PX_PER_MM;
+        const hPx = dev.height_mm * PX_PER_MM;
+        const leftPx = (dev.x_mm - dev.width_mm / 2) * PX_PER_MM;
+        const topPx = (dev.y_mm - dev.height_mm / 2) * PX_PER_MM;
+
+        const el = document.createElement("div");
+        const isSel = dev.designator === selectedDeviceId;
+        const borderCol = !dev.datasheet_verified ? "#f59e0b" : dev.border;
+        el.className = "absolute rounded shadow-lg flex flex-col justify-between p-1 cursor-grab active:cursor-grabbing";
+        el.style.width = `${wPx}px`;
+        el.style.height = `${hPx}px`;
+        el.style.left = `${leftPx}px`;
+        el.style.top = `${topPx}px`;
+        el.style.backgroundColor = dev.color || "#1e293b";
+        el.style.border = `${isSel ? 2.5 : 1.5}px solid ${borderCol}`;
+        if (isSel) el.style.boxShadow = `0 0 12px ${borderCol}66`;
+
+        // Encabezado del componente
+        let ledGlow = "";
+        if (dev.isLed) {
+          const iLed = computeLedCurrentMa();
+          const on = simGpioHigh && iLed > 0.5;
+          ledGlow = `<span class="inline-block w-3 h-3 rounded-full ${on ? "bg-rose-500 shadow-[0_0_10px_#f43f5e]" : "bg-rose-950 border border-rose-700"}"></span>`;
+        }
+
+        const badge = dev.datasheet_verified
+          ? `<span class="text-[9px] text-emerald-300 font-mono">OK</span>`
+          : `<span class="text-[9px] text-amber-300 font-bold animate-pulse">SIN FICHA</span>`;
+
+        el.innerHTML = `
+          <div class="flex items-center justify-between text-[10px] font-bold leading-none">
+            <span class="text-white">${dev.designator}</span>
+            ${ledGlow || badge}
+          </div>
+          <div class="text-[9px] text-slate-300 text-center leading-tight truncate">${dev.name}</div>
+          <div class="text-[8px] text-slate-400 font-mono text-center">${dev.x_mm.toFixed(0)},${dev.y_mm.toFixed(0)}mm</div>
+        `;
+
+        // Drag & Drop real sobre el PCB
+        el.addEventListener("mousedown", (e) => {
+          if (e.target.dataset.pin) return;
+          selectedDeviceId = dev.designator;
+          renderInspector();
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const origX = dev.x_mm;
+          const origY = dev.y_mm;
+
+          const onMove = (ev) => {
+            const dxMm = (ev.clientX - startX) / PX_PER_MM;
+            const dyMm = (ev.clientY - startY) / PX_PER_MM;
+            // Snap a grilla de 1 mm
+            dev.x_mm = Math.max(dev.width_mm / 2 + 1, Math.min(BOARD_W_MM - dev.width_mm / 2 - 1, Math.round(origX + dxMm)));
+            dev.y_mm = Math.max(dev.height_mm / 2 + 1, Math.min(BOARD_H_MM - dev.height_mm / 2 - 1, Math.round(origY + dyMm)));
+            recalculateAll();
+          };
+          const onUp = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+          };
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        });
+
+        // Dibujar pines reales sobre los bordes del componente
+        const leftPins = dev.pins.filter((p) => p.side === "left");
+        const rightPins = dev.pins.filter((p) => p.side === "right");
+
+        const mountPins = (list, side) => {
+          const step = hPx / (list.length + 1);
+          list.forEach((pin, idx) => {
+            const dot = document.createElement("div");
+            dot.dataset.pin = "1";
+            dot.title = `${dev.designator}.${pin.number} (${pin.name}) — ${pin.voltage_v ?? "?"}V / ${pin.type}`;
+            const isPinSel = selectedPinRef && selectedPinRef.deviceId === dev.designator && selectedPinRef.pinNum === pin.number;
+            dot.className = `pin-dot absolute w-3 h-3 rounded-full border border-slate-950 cursor-pointer ${isPinSel ? "pin-selected" : ""}`;
+            dot.style.top = `${step * (idx + 1) - 6}px`;
+            dot.style[side] = `-6px`;
+            dot.style.backgroundColor = pin.type === "gnd" ? "#38bdf8" : pin.type.startsWith("power") ? "#ef4444" : pin.type === "i2c" ? "#34d399" : "#facc15";
+
+            dot.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              handlePinClick(dev.designator, pin.number);
+            });
+            el.appendChild(dot);
+          });
+        };
+
+        mountPins(leftPins, "left");
+        mountPins(rightPins, "right");
+        layer.appendChild(el);
+      });
+
+      renderWires();
+      renderInspector();
+    }
+
+    function renderWires() {
+      const svg = document.getElementById("wiresSvg");
+      svg.innerHTML = "";
+      connections.forEach((c) => {
+        const d1 = devices.find((d) => d.designator === c.from_device);
+        const d2 = devices.find((d) => d.designator === c.to_device);
+        if (!d1 || !d2) return;
+        const p1 = d1.pins.find((p) => p.number === c.from_pin);
+        const p2 = d2.pins.find((p) => p.number === c.to_pin);
+        if (!p1 || !p2) return;
+        const pos1 = getPinCanvasPos(d1, p1);
+        const pos2 = getPinCanvasPos(d2, p2);
+        const midX = (pos1.x + pos2.x) / 2;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", `M ${pos1.x} ${pos1.y} C ${midX} ${pos1.y}, ${midX} ${pos2.y}, ${pos2.x} ${pos2.y}`);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", getNetColor(c.net));
+        path.setAttribute("stroke-width", c.net === "GND" || c.net === "+3V3" ? "2.4" : "1.8");
+        path.setAttribute("stroke-opacity", "0.85");
+        svg.appendChild(path);
+      });
+    }
+
+    function handlePinClick(deviceId, pinNum) {
+      if (!wiringMode) {
+        wiringMode = true;
+        updateWireModeBtn();
+      }
+      if (!selectedPinRef) {
+        selectedPinRef = { deviceId, pinNum };
+        document.getElementById("wiringHint").textContent = `Origen: ${deviceId}.${pinNum} — Haz clic en el pin destino.`;
+        renderBoard();
+        return;
+      }
+      if (selectedPinRef.deviceId === deviceId && selectedPinRef.pinNum === pinNum) {
+        selectedPinRef = null;
+        renderBoard();
+        return;
+      }
+      const d1 = devices.find((d) => d.designator === selectedPinRef.deviceId);
+      const p1 = d1.pins.find((p) => p.number === selectedPinRef.pinNum);
+      const netName = p1.type === "gnd" ? "GND" : p1.name.replace("/", "_");
+      connections.push({
+        net: netName,
+        from_device: selectedPinRef.deviceId,
+        from_pin: selectedPinRef.pinNum,
+        to_device: deviceId,
+        to_pin: pinNum,
+      });
+      selectedPinRef = null;
+      document.getElementById("wiringHint").textContent = "Conexión agregada y recalculada.";
+      renderBoard();
+      recalculateAll();
+    }
+
+    function toggleWiringMode() {
+      wiringMode = !wiringMode;
+      selectedPinRef = null;
+      updateWireModeBtn();
+      renderBoard();
+    }
+
+    function updateWireModeBtn() {
+      const btn = document.getElementById("btnWireMode");
+      btn.textContent = wiringMode ? "Modo Cableado: ON" : "Modo Cableado: OFF";
+      btn.className = wiringMode
+        ? "px-2.5 py-1.5 text-xs font-semibold rounded bg-emerald-600 text-white cursor-pointer"
+        : "px-2.5 py-1.5 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 cursor-pointer";
+    }
+
+    function computeLedCurrentMa() {
+      const rLed = parseFloat(document.getElementById("rLedInput").value);
+      const vGpio = simGpioHigh ? 3.3 : 0.0;
+      const vf = 2.0;
+      if (vGpio <= vf) return 0.0;
+      return ((vGpio - vf) / rLed) * 1000.0;
+    }
+
+    function checkCollisions() {
+      const collisions = [];
+      for (let i = 0; i < devices.length; i++) {
+        for (let j = i + 1; j < devices.length; j++) {
+          const a = devices[i];
+          const b = devices[j];
+          const gap = 1.0;
+          const overlapX = Math.abs(a.x_mm - b.x_mm) < (a.width_mm + b.width_mm) / 2 + gap;
+          const overlapY = Math.abs(a.y_mm - b.y_mm) < (a.height_mm + b.height_mm) / 2 + gap;
+          if (overlapX && overlapY) {
+            collisions.push(`${a.designator} colisiona con ${b.designator}`);
+          }
+        }
+      }
+      return collisions;
+    }
+
+    function recalculateAll() {
+      const vSup = parseFloat(document.getElementById("vSupply").value);
+      const rLed = parseFloat(document.getElementById("rLedInput").value);
+      document.getElementById("vSupplyVal").textContent = `${vSup.toFixed(2)} V`;
+      document.getElementById("rLedVal").textContent = `${rLed} Ω`;
+
+      const iLedMa = computeLedCurrentMa();
+      const pR1Mw = ((iLedMa / 1000.0) ** 2) * rLed * 1000.0;
+      const iBaseMcuMa = simButtonPressed ? 42.0 : 18.0; // Activo vs espera
+      const iTotalMa = iBaseMcuMa + iLedMa + 0.7; // + BME280
+      // Fórmula IPC-2221 externa 1oz dT=10C
+      const iAmp = Math.max(0.1, iTotalMa / 1000.0);
+      const areaMil2 = Math.pow(iAmp / (0.048 * Math.pow(10, 0.44)), 1 / 0.725);
+      const widthMm = Math.max(0.25, (areaMil2 / 1.378) * 0.0254);
+
+      document.getElementById("calcILed").textContent = `${iLedMa.toFixed(2)} mA`;
+      document.getElementById("calcILed").className = iLedMa > 20 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold";
+      document.getElementById("calcPR1").textContent = `${pR1Mw.toFixed(2)} mW`;
+      document.getElementById("calcITotal").textContent = `${iTotalMa.toFixed(1)} mA`;
+      document.getElementById("calcIpcWidth").textContent = `${widthMm.toFixed(2)} mm`;
+
+      // Validación estricta Datasheet-First + Eléctrica + Colisiones
+      const missingDatasheets = devices.filter((d) => !d.datasheet_verified || !d.datasheet_source);
+      const electricalErrors = [];
+      if (iLedMa > 20.0) {
+        electricalErrors.push(`SOBRECORRIENTE EN LED/GPIO21: ${iLedMa.toFixed(1)} mA excede el límite de 20 mA (aumente R1).`);
+      }
+
+      connections.forEach((c) => {
+        const d1 = devices.find((d) => d.designator === c.from_device);
+        const d2 = devices.find((d) => d.designator === c.to_device);
+        if (!d1 || !d2) return;
+        const p1 = d1.pins.find((p) => p.number === c.from_pin);
+        const p2 = d2.pins.find((p) => p.number === c.to_pin);
+        if (!p1 || !p2) return;
+        if ((p1.type.startsWith("power") && p2.type === "gnd") || (p2.type.startsWith("power") && p1.type === "gnd")) {
+          electricalErrors.push(`CORTOCIRCUITO: ${c.from_device}.${p1.name} conectado a ${c.to_device}.${p2.name}.`);
+        }
+        if (p1.voltage_v != null && p2.voltage_v != null && Math.abs(p1.voltage_v - p2.voltage_v) > 0.6) {
+          electricalErrors.push(`CONFLICTO DE VOLTAJE (${c.net}): ${c.from_device}.${p1.name} (${p1.voltage_v}V) vs ${c.to_device}.${p2.name} (${p2.voltage_v}V).`);
+        }
+      });
+
+      const collisions = checkCollisions();
+      const collBadge = document.getElementById("collisionBadge");
+      collBadge.textContent = collisions.length === 0 ? "0 Colisiones 2D" : `${collisions.length} Colisión(es) 2D`;
+      collBadge.className = collisions.length === 0 ? "text-emerald-400" : "text-rose-400 font-bold";
+
+      const canProceed = missingDatasheets.length === 0 && electricalErrors.length === 0 && collisions.length === 0;
+      const gateBadge = document.getElementById("gateBadge");
+      const gateMessages = document.getElementById("gateMessages");
+      const btnPromote = document.getElementById("btnPromote");
+
+      if (canProceed) {
+        gateBadge.textContent = "APROBADO";
+        gateBadge.className = "text-xs px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        gateMessages.innerHTML = `<div class="text-emerald-300">Todas las fichas técnicas verificadas, 0 errores eléctricos y 0 colisiones. Listo para EasyEDA Pro.</div>`;
+        btnPromote.disabled = false;
+        btnPromote.className = "px-3 py-1.5 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer";
+      } else {
+        gateBadge.textContent = "BLOQUEADO";
+        gateBadge.className = "text-xs px-2 py-0.5 rounded font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+        let html = "";
+        missingDatasheets.forEach((d) => {
+          html += `<div class="p-1.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-200"><strong>FALTA FICHA TÉCNICA (${d.designator} - ${d.name}):</strong> Deténgase y solicite el datasheet oficial antes de continuar.</div>`;
+        });
+        electricalErrors.forEach((err) => {
+          html += `<div class="p-1.5 rounded bg-rose-500/15 border border-rose-500/40 text-rose-200">${err}</div>`;
+        });
+        collisions.forEach((col) => {
+          html += `<div class="p-1.5 rounded bg-rose-500/15 border border-rose-500/40 text-rose-200">Colisión física: ${col}</div>`;
+        });
+        gateMessages.innerHTML = html;
+        btnPromote.disabled = true;
+        btnPromote.className = "px-3 py-1.5 text-xs font-semibold rounded bg-slate-700 text-slate-400 cursor-not-allowed";
+      }
+
+      renderConnectionsTable();
+      updateExportJson(canProceed);
+      renderBoard();
+    }
+
+    function renderConnectionsTable() {
+      const box = document.getElementById("connectionsTable");
+      document.getElementById("netCountBadge").textContent = `${connections.length} conexiones`;
+      box.innerHTML = connections
+        .map(
+          (c, i) => `
+          <div class="flex items-center justify-between bg-slate-950 px-2 py-1 rounded border border-slate-800">
+            <div>
+              <span class="font-bold" style="color:${getNetColor(c.net)}">${c.net}</span>
+              <span class="text-slate-400 ml-2">${c.from_device}.P${c.from_pin} &harr; ${c.to_device}.P${c.to_pin}</span>
+            </div>
+            <button onclick="removeConnection(${i})" class="text-rose-400 hover:text-rose-300 cursor-pointer">Quitar</button>
+          </div>`
+        )
+        .join("");
+    }
+
+    function removeConnection(idx) {
+      connections.splice(idx, 1);
+      recalculateAll();
+    }
+
+    function renderInspector() {
+      const dev = devices.find((d) => d.designator === selectedDeviceId);
+      const box = document.getElementById("inspectorBody");
+      if (!dev) return;
+      const xMil = (dev.x_mm * MM_TO_MIL).toFixed(1);
+      const yMil = (dev.y_mm * MM_TO_MIL).toFixed(1);
+      const pinsHtml = dev.pins
+        .map(
+          (p) =>
+            `<div class="flex justify-between border-b border-slate-800/80 py-0.5 font-mono text-[11px]">
+              <span class="text-slate-200">P${p.number} ${p.name}</span>
+              <span class="text-slate-400">${p.voltage_v}V (${p.type})</span>
+            </div>`
+        )
+        .join("");
+
+      box.innerHTML = `
+        <div class="font-bold text-white">${dev.designator} — ${dev.name}</div>
+        <div class="text-[11px] ${dev.datasheet_verified ? "text-emerald-300" : "text-amber-300 font-semibold"}">
+          Fuente: ${dev.datasheet_verified ? dev.datasheet_source : "NO VERIFICADA — Solicitar Datasheet"}
+        </div>
+        <div class="font-mono text-[11px] text-sky-300 bg-slate-950 p-1.5 rounded border border-slate-800">
+          Posición: (${dev.x_mm} mm, ${dev.y_mm} mm) | (${xMil} mil, ${yMil} mil) | Rot: ${dev.rotation}°
+        </div>
+        <div class="pt-1">${pinsHtml}</div>
+      `;
+    }
+
+    function rotateSelected() {
+      const dev = devices.find((d) => d.designator === selectedDeviceId);
+      if (!dev) return;
+      dev.rotation = (dev.rotation + 90) % 360;
+      const tmp = dev.width_mm;
+      dev.width_mm = dev.height_mm;
+      dev.height_mm = tmp;
+      recalculateAll();
+    }
+
+    function toggleButtonSim() {
+      simButtonPressed = !simButtonPressed;
+      const btn = document.getElementById("btnSimPress");
+      btn.textContent = simButtonPressed ? "PRESIONADO (LOW 0V)" : "SUELTO (HIGH 3.3V)";
+      btn.className = simButtonPressed
+        ? "px-2.5 py-1 rounded text-xs font-semibold bg-amber-600 text-white cursor-pointer"
+        : "px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 border border-slate-600 text-slate-200 cursor-pointer";
+      recalculateAll();
+    }
+
+    function toggleGpioSim() {
+      simGpioHigh = !simGpioHigh;
+      const btn = document.getElementById("btnGpioToggle");
+      btn.textContent = simGpioHigh ? "ACTIVA (3.3V)" : "APAGADA (0V)";
+      btn.className = simGpioHigh
+        ? "px-2.5 py-1 rounded text-xs font-semibold bg-emerald-600 text-white cursor-pointer"
+        : "px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 border border-slate-600 text-slate-300 cursor-pointer";
+      recalculateAll();
+    }
+
+    function updateExportJson(canProceed) {
+      const payload = {
+        tool: "pcb_verify_connection_board",
+        status: canProceed ? "READY_FOR_EASYEDA_PRO" : "BLOCKED",
+        board_width_mm: BOARD_W_MM,
+        board_height_mm: BOARD_H_MM,
+        devices: devices.map((d) => ({
+          designator: d.designator,
+          name: d.name,
+          datasheet_verified: d.datasheet_verified,
+          datasheet_source: d.datasheet_source,
+          x_mm: d.x_mm,
+          y_mm: d.y_mm,
+          x_mil: Number((d.x_mm * MM_TO_MIL).toFixed(2)),
+          y_mil: Number((d.y_mm * MM_TO_MIL).toFixed(2)),
+          width_mm: d.width_mm,
+          height_mm: d.height_mm,
+          rotation: d.rotation,
+          pins: d.pins,
+        })),
+        connections,
+      };
+      document.getElementById("exportJsonBox").value = JSON.stringify(payload, null, 2);
+    }
+
+    function exportEasyEdaJson() {
+      copyExportJson();
+      alert("JSON verificado copiado. Pásalo al agente para ejecutar pcb_verify_connection_board y construir el esquemático + PCB en EasyEDA Pro.");
+    }
+
+    function copyExportJson() {
+      const box = document.getElementById("exportJsonBox");
+      box.select();
+      document.execCommand("copy");
+    }
+
+    function openAddDeviceModal() {
+      document.getElementById("addModal").classList.remove("hidden");
+    }
+
+    function closeAddDeviceModal() {
+      document.getElementById("addModal").classList.add("hidden");
+    }
+
+    function applyModalPreset() {
+      const val = document.getElementById("modalPreset").value;
+      if (val === "custom_unverified") {
+        document.getElementById("modalDes").value = "M2";
+        document.getElementById("modalName").value = "Sensor Desconocido XYZ";
+        document.getElementById("modalSource").value = "";
+      } else if (val === "relay_5v") {
+        document.getElementById("modalDes").value = "K1";
+        document.getElementById("modalName").value = "Módulo Relé 5V";
+        document.getElementById("modalSource").value = "Songle SRD-05VDC-SL-C Datasheet + Opto PC817";
+      } else if (val === "uart_gps") {
+        document.getElementById("modalDes").value = "M3";
+        document.getElementById("modalName").value = "GPS NEO-6M (3.3V)";
+        document.getElementById("modalSource").value = "u-blox NEO-6 Data Sheet GPS.G6-HW-09005";
+      }
+    }
+
+    function confirmAddDevice() {
+      const des = document.getElementById("modalDes").value.trim() || `M${devices.length + 1}`;
+      const name = document.getElementById("modalName").value.trim() || "Equipo";
+      const source = document.getElementById("modalSource").value.trim();
+      const preset = document.getElementById("modalPreset").value;
+      const verified = source.length > 0;
+
+      let pins = [
+        { number: "1", name: "VCC", side: "left", type: "power_in", voltage_v: preset === "relay_5v" ? 5.0 : 3.3, max_current_ma: 80, tolerant_5v: false },
+        { number: "2", name: "GND", side: "left", type: "gnd", voltage_v: 0.0, max_current_ma: 80, tolerant_5v: false },
+        { number: "3", name: preset === "uart_gps" ? "TX" : "IN", side: "right", type: "gpio", voltage_v: preset === "relay_5v" ? 5.0 : 3.3, max_current_ma: 10, tolerant_5v: false },
+      ];
+
+      devices.push({
+        designator: des,
+        name,
+        datasheet_verified: verified,
+        datasheet_source: source,
+        x_mm: 96,
+        y_mm: 20,
+        width_mm: 20,
+        height_mm: 16,
+        rotation: 0,
+        color: verified ? "#172554" : "#451a03",
+        border: verified ? "#38bdf8" : "#f59e0b",
+        pins,
+      });
+
+      selectedDeviceId = des;
+      closeAddDeviceModal();
+      recalculateAll();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      recalculateAll();
+    });
+  </script>
+</body>
+</html>
