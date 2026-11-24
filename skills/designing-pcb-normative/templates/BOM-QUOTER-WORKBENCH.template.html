@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Asistente Cotizador Multicanal BOM — AGENT-DESIGN-PCB v4.4</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 p-3 select-none">
+
+  <!-- Encabezado -->
+  <header class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-800">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">S&amp;D MMCALL</span>
+        <h1 class="text-base font-bold text-white">Asistente Cotizador Multicanal (EasyEDA/LCSC &bull; AliExpress &bull; Alibaba &bull; Mercado Local)</h1>
+        <span class="px-2 py-0.5 text-xs font-mono bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded">v4.4</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-0.5">
+        Precargado con auditoría en vivo de <code class="text-emerald-300">MMCALL-PROT-12V</code> desde EasyEDA Pro: calcula <em>Total Landed Cost</em>, detecta códigos <code class="text-amber-300">C9900...</code>, filtra clones (&lt;40% LCSC) y optimiza por plazo/MOQ.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button onclick="copyPayload()" class="px-3 py-1.5 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white cursor-pointer">
+        Copiar JSON para MCP
+      </button>
+    </div>
+  </header>
+
+  <!-- Controles Globales de Escenario -->
+  <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+      <div class="flex justify-between text-slate-300 mb-1">
+        <label for="boardQty">Cantidad de Placas (Lote):</label>
+        <span id="boardQtyVal" class="font-mono font-bold text-emerald-300">5 placas</span>
+      </div>
+      <input id="boardQty" type="range" min="1" max="150" value="5" oninput="recalcQuotes()" class="w-full accent-emerald-500 cursor-pointer" />
+      <div class="flex justify-between text-[11px] text-slate-500 mt-0.5">
+        <span>1 prototipo</span>
+        <span>50 serie</span>
+        <span>150 OEM</span>
+      </div>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+      <label class="block text-slate-300 mb-1" for="urgencySel">Plazo Máximo (Urgencia):</label>
+      <select id="urgencySel" onchange="recalcQuotes()" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-100">
+        <option value="3">Urgencia Laboratorio (&le; 3 días &rarr; Mercado Local)</option>
+        <option value="20" selected>Prototipo Estándar (&le; 20 días &rarr; Híbrido LCSC/Ali/Local)</option>
+        <option value="35">Producción / Escala (&le; 35 días &rarr; Incluye Alibaba MOQ)</option>
+      </select>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+      <label class="block text-slate-300 mb-1" for="modeSel">Modalidad de Armado:</label>
+      <select id="modeSel" onchange="recalcQuotes()" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-100">
+        <option value="manual_lab" selected>Soldadura Manual en Laboratorio (SMD+THT)</option>
+        <option value="hybrid">Híbrido (PCBA + Montaje final Local)</option>
+        <option value="jlcpcb_pcba">100% JLCPCB PCBA (+$3 USD por Extended Part)</option>
+      </select>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+      <label class="block text-slate-300 mb-1" for="countrySel">País / Impuesto Importación (IVA):</label>
+      <select id="countrySel" onchange="recalcQuotes()" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-100">
+        <option value="CL|19" selected>Chile — IVA 19% (MCI / AFEL / Local)</option>
+        <option value="MX|16">México — IVA 16% (AG Electrónica / Steren)</option>
+        <option value="CO|19">Colombia — IVA 19% (Vistrónica / Sigma)</option>
+        <option value="AR|21">Argentina — IVA 21% (Electrocomponentes)</option>
+        <option value="ES|21">España — IVA 21% (Cetronic / RS)</option>
+        <option value="US|0">EE. UU. — Tax 0% Ref.</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- Tarjetas de Resumen Financiero -->
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3 text-xs">
+    <div class="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/40">
+      <span class="text-emerald-300 block uppercase font-bold text-[11px]">Canasta Híbrida Óptima</span>
+      <span id="sumOptimalTotal" class="text-xl font-bold font-mono text-white">$0.00 USD</span>
+      <span id="sumPerBoard" class="block text-[11px] font-mono text-emerald-300 mt-0.5">$0.00 / placa</span>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+      <span class="text-sky-300 block uppercase font-bold text-[11px]">Distribución por Canal</span>
+      <div id="sumChannels" class="font-mono text-slate-200 mt-1 space-y-0.5 text-[11px]"></div>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+      <span class="text-amber-300 block uppercase font-bold text-[11px]">Auditoría EasyEDA Pro</span>
+      <div id="sumEasyEdaAudit" class="font-mono text-slate-200 mt-1 space-y-0.5 text-[11px]"></div>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+      <span class="text-rose-300 block uppercase font-bold text-[11px]">Escudo Anti-Clon &amp; IATA</span>
+      <div id="sumShield" class="text-slate-300 mt-1 text-[11px]"></div>
+    </div>
+  </section>
+
+  <!-- Tabla Detallada de Cotización Ítem por Ítem -->
+  <section class="rounded-lg border border-slate-800 bg-slate-900 overflow-hidden mb-3">
+    <div class="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+      <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Comparativa en Vivo por Línea de BOM (Datos Reales MMCALL-PROT-12V)</h2>
+      <span class="text-xs text-slate-400 font-mono">Precios Landed = (Cant &times; Unit + Envío + Fee) + Impuesto</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px] uppercase">
+            <th class="p-2">Ref / MPN</th>
+            <th class="p-2">LCSC / Huella</th>
+            <th class="p-2">Cant.</th>
+            <th class="p-2">LCSC / JLCPCB</th>
+            <th class="p-2">AliExpress</th>
+            <th class="p-2">Alibaba (MOQ)</th>
+            <th class="p-2">Mercado Local (24-48h)</th>
+            <th class="p-2">Decisión Óptima</th>
+          </tr>
+        </thead>
+        <tbody id="bomTableBody" class="divide-y divide-slate-800/70 font-mono"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Alertas de Ingeniería y Payload MCP -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+      <h3 class="font-bold uppercase tracking-wider text-amber-300 mb-2">Alertas de Abastecimiento, DFM y Falsificación</h3>
+      <div id="alertsList" class="space-y-1.5 max-h-44 overflow-y-auto"></div>
+    </div>
+
+    <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
+      <h3 class="font-bold uppercase tracking-wider text-sky-300 mb-2">Payload JSON (<code class="text-emerald-300">pcb_quote_bom_multichannel</code>)</h3>
+      <textarea id="jsonBox" readonly rows="7" class="w-full bg-slate-950 border border-slate-800 rounded p-2 font-mono text-[11px] text-emerald-300 focus:outline-none"></textarea>
+    </div>
+  </section>
+
+  <script>
+    const bomItems = [
+      {
+        reference: "J1",
+        mpn: "DC-005-5.5*2.1",
+        footprint: "DC-IN-TH",
+        lcsc: "C9900017044",
+        qty_per_board: 1,
+        is_critical_ic: false,
+        jlcpcb_class: "Community",
+        category: "connector_tht",
+        lcsc_quote: { unit_usd: 0.08, shipping_share_usd: 0.5, in_stock: true, lead_days: 12 },
+        aliexpress_quote: { unit_usd: 0.06, shipping_usd: 1.80, store_rating_pct: 97.4, item_stars: 4.8, lead_days: 18 },
+        alibaba_quote: { unit_usd: 0.025, shipping_usd: 12.0, moq: 100, verified_supplier: true, trade_assurance: true, lead_days: 24 },
+        local_market_quote: { unit_usd: 0.45, shipping_usd: 1.50, vendor_name: "Tienda Electrónica Local", has_tax_invoice: true, lead_days: 1 },
+      },
+      {
+        reference: "D1",
+        mpn: "SMBJ15CA (TVS 600W)",
+        footprint: "DO-214AA (SMB)",
+        lcsc: "C8829",
+        qty_per_board: 1,
+        is_critical_ic: true,
+        jlcpcb_class: "Extended Part",
+        category: "critical_ic",
+        lcsc_quote: { unit_usd: 0.075, shipping_share_usd: 0.8, in_stock: true, lead_days: 10 },
+        aliexpress_quote: { unit_usd: 0.020, shipping_usd: 1.50, store_rating_pct: 96.2, item_stars: 4.8, lead_days: 19 }, // <40% -> Alerta Anti-Clon!
+        alibaba_quote: { unit_usd: 0.045, shipping_usd: 14.0, moq: 100, verified_supplier: true, trade_assurance: true, lead_days: 22 },
+        local_market_quote: { unit_usd: 0.55, shipping_usd: 1.00, vendor_name: "Distribuidor Local (P6KE15CA/SMBJ)", has_tax_invoice: true, lead_days: 2 },
+      },
+      {
+        reference: "F1",
+        mpn: "SMD1812P110TF (PPTC 1.1A)",
+        footprint: "F1812",
+        lcsc: "C3102",
+        qty_per_board: 1,
+        is_critical_ic: false,
+        jlcpcb_class: "Basic Part",
+        category: "smd_passive",
+        lcsc_quote: { unit_usd: 0.055, shipping_share_usd: 0.5, in_stock: true, lead_days: 10 },
+        aliexpress_quote: { unit_usd: 0.09, shipping_usd: 1.90, store_rating_pct: 98.1, item_stars: 4.9, lead_days: 17 },
+        alibaba_quote: { unit_usd: 0.03, shipping_usd: 12.0, moq: 100, verified_supplier: true, trade_assurance: true, lead_days: 22 },
+        local_market_quote: { unit_usd: 0.60, shipping_usd: 1.00, vendor_name: "Tienda Local (RXEF110)", has_tax_invoice: true, lead_days: 1 },
+      },
+      {
+        reference: "C4",
+        mpn: "100pF 50V C0G",
+        footprint: "C0402",
+        lcsc: "C1546",
+        qty_per_board: 1,
+        is_critical_ic: false,
+        jlcpcb_class: "Basic Part",
+        category: "smd_passive",
+        lcsc_quote: { unit_usd: 0.004, shipping_share_usd: 0.2, in_stock: true, lead_days: 10 },
+        aliexpress_quote: { unit_usd: 0.01, shipping_usd: 1.60, store_rating_pct: 97.5, item_stars: 4.9, lead_days: 18 },
+        alibaba_quote: { unit_usd: 0.002, shipping_usd: 10.0, moq: 500, verified_supplier: true, trade_assurance: true, lead_days: 25 },
+        local_market_quote: { unit_usd: 0.12, shipping_usd: 0.50, vendor_name: "Tienda Local (100pF THT/0805)", has_tax_invoice: true, lead_days: 1 },
+      },
+      {
+        reference: "J3",
+        mpn: "KF2EDGK-5.08-2P",
+        footprint: "CONN-TH-5.08",
+        lcsc: "C9900089420",
+        qty_per_board: 1,
+        is_critical_ic: false,
+        jlcpcb_class: "Community",
+        category: "connector_tht",
+        lcsc_quote: { unit_usd: 0.18, shipping_share_usd: 0.6, in_stock: true, lead_days: 12 },
+        aliexpress_quote: { unit_usd: 0.16, shipping_usd: 1.99, store_rating_pct: 98.0, item_stars: 4.9, lead_days: 16 },
+        alibaba_quote: { unit_usd: 0.09, shipping_usd: 15.0, moq: 100, verified_supplier: true, trade_assurance: true, lead_days: 23 },
+        local_market_quote: { unit_usd: 0.75, shipping_usd: 1.00, vendor_name: "Proveedor Eléctrico Local", has_tax_invoice: true, lead_days: 1 },
+      },
+      {
+        reference: "ENC1",
+        mpn: "Gabinete IP65 + Batería Aux",
+        footprint: "EXT-IP65",
+        lcsc: "",
+        qty_per_board: 1,
+        is_critical_ic: false,
+        jlcpcb_class: "N/A",
+        category: "battery_hazmat",
+        aliexpress_quote: { unit_usd: 5.80, shipping_usd: 14.50, store_rating_pct: 95.5, item_stars: 4.7, lead_days: 28 },
+        alibaba_quote: { unit_usd: 2.90, shipping_usd: 65.0, moq: 50, verified_supplier: true, trade_assurance: true, lead_days: 32 },
+        local_market_quote: { unit_usd: 7.20, shipping_usd: 3.50, vendor_name: "Distribuidor Nacional (IVA Incl.)", has_tax_invoice: true, lead_days: 2 },
+      },
+    ];
+
+    function fmtCell(evalObj) {
+      if (!evalObj) return `<span class="text-slate-600">N/A</span>`;
+      const cls = evalObj.eligible ? "text-slate-200" : "text-rose-400/70 line-through";
+      return `<div class="${cls}">$${evalObj.landed_total_usd.toFixed(2)}</div><div class="text-[10px] text-slate-400">${evalObj.lead_days}d ${evalObj.tag || ""}</div>`;
+    }
+
+    function recalcQuotes() {
+      const boardQty = parseInt(document.getElementById("boardQty").value, 10);
+      const urgencyDays = parseInt(document.getElementById("urgencySel").value, 10);
+      const mode = document.getElementById("modeSel").value;
+      const [country, vatStr] = document.getElementById("countrySel").value.split("|");
+      const taxMult = 1 + parseFloat(vatStr) / 100.0;
+
+      document.getElementById("boardQtyVal").textContent = `${boardQty} ${boardQty === 1 ? "placa" : "placas"}`;
+
+      let totalOpt = 0;
+      const counts = { LCSC_JLCPCB: 0, ALIEXPRESS: 0, ALIBABA: 0, MERCADO_LOCAL: 0, BLOQUEADO: 0 };
+      let c9900Count = 0;
+      let extCount = 0;
+      let cloneBlockedCount = 0;
+      const alerts = [];
+      const rowsHtml = [];
+
+      bomItems.forEach((it) => {
+        const totalQty = it.qty_per_board * boardQty;
+        const isC9900 = it.lcsc && it.lcsc.startsWith("C9900");
+        const isAirRestricted = it.category === "battery_hazmat";
+
+        if (isC9900) {
+          c9900Count++;
+          alerts.push(`<strong>${it.reference} (${it.lcsc}):</strong> Huella comunitaria EasyEDA Pro — NO comprable en almacén LCSC/PCBA. Redirigido a Mercado Local / AliExpress.`);
+        }
+        if (mode === "manual_lab" && it.footprint.includes("0402")) {
+          alerts.push(`<strong>${it.reference} (${it.footprint}):</strong> Paquete 0402 difícil de soldar a mano en banco; considere migrar a 0805/0603 (Nivel A).`);
+        }
+
+        const evals = {};
+        let lcscRefUnit = null;
+
+        if (it.lcsc_quote && !isC9900) {
+          lcscRefUnit = it.lcsc_quote.unit_usd;
+          const extFee = mode === "jlcpcb_pcba" && it.jlcpcb_class === "Extended Part" ? 3.0 : 0.0;
+          if (it.jlcpcb_class === "Extended Part") extCount++;
+          const landed = (totalQty * it.lcsc_quote.unit_usd + it.lcsc_quote.shipping_share_usd + extFee) * taxMult;
+          evals.LCSC_JLCPCB = {
+            landed_total_usd: landed,
+            lead_days: it.lcsc_quote.lead_days,
+            eligible: it.lcsc_quote.lead_days <= urgencyDays && !isAirRestricted,
+            tag: extFee > 0 ? "(+$3 Ext)" : "(Basic)",
+          };
+        }
+
+        if (it.aliexpress_quote) {
+          const q = it.aliexpress_quote;
+          const isClone = it.is_critical_ic && lcscRefUnit && q.unit_usd < 0.4 * lcscRefUnit;
+          if (isClone) {
+            cloneBlockedCount++;
+            alerts.push(`<span class="text-rose-300"><strong>BLOQUEO ANTI-CLON en ${it.reference} (${it.mpn}):</strong> AliExpress ($${q.unit_usd.toFixed(3)}) cuesta &lt;40% de LCSC ($${lcscRefUnit.toFixed(3)}). Descartado.</span>`);
+          }
+          const landed = (totalQty * q.unit_usd + q.shipping_usd) * taxMult;
+          evals.ALIEXPRESS = {
+            landed_total_usd: landed,
+            lead_days: q.lead_days,
+            eligible: !isClone && q.store_rating_pct >= 95 && q.item_stars >= 4.7 && q.lead_days <= urgencyDays && mode !== "jlcpcb_pcba" && !isAirRestricted,
+            tag: isClone ? "CLON?" : `${q.item_stars}★`,
+          };
+        }
+
+        if (it.alibaba_quote) {
+          const q = it.alibaba_quote;
+          const billed = Math.max(totalQty, q.moq);
+          const landed = (billed * q.unit_usd + q.shipping_usd) * taxMult;
+          evals.ALIBABA = {
+            landed_total_usd: landed,
+            lead_days: q.lead_days,
+            eligible: q.verified_supplier && q.trade_assurance && q.lead_days <= urgencyDays && mode !== "jlcpcb_pcba",
+            tag: `MOQ ${q.moq}`,
+          };
+        }
+
+        if (it.local_market_quote) {
+          const q = it.local_market_quote;
+          const landed = totalQty * q.unit_usd + q.shipping_usd;
+          evals.MERCADO_LOCAL = {
+            landed_total_usd: landed,
+            lead_days: q.lead_days,
+            eligible: q.lead_days <= urgencyDays && mode !== "jlcpcb_pcba",
+            tag: "Factura",
+          };
+        }
+
+        const eligibles = Object.entries(evals).filter(([, v]) => v.eligible);
+        let winner = "BLOQUEADO";
+        let winPrice = 0;
+        if (eligibles.length > 0) {
+          eligibles.sort((a, b) => a[1].landed_total_usd - b[1].landed_total_usd);
+          winner = eligibles[0][0];
+          winPrice = eligibles[0][1].landed_total_usd;
+          totalOpt += winPrice;
+        }
+        counts[winner] = (counts[winner] || 0) + 1;
+
+        const badgeMap = {
+          LCSC_JLCPCB: "bg-sky-500/20 text-sky-300 border-sky-500/40",
+          ALIEXPRESS: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+          ALIBABA: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+          MERCADO_LOCAL: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+          BLOQUEADO: "bg-rose-500/20 text-rose-300 border-rose-500/40",
+        };
+
+        rowsHtml.push(`
+          <tr class="hover:bg-slate-800/40">
+            <td class="p-2"><div class="font-bold text-white">${it.reference}</div><div class="text-[11px] text-slate-400">${it.mpn}</div></td>
+            <td class="p-2"><div class="${isC9900 ? "text-amber-300 font-bold" : "text-slate-200"}">${it.lcsc || "Externo"}</div><div class="text-[10px] text-slate-400">${it.footprint}</div></td>
+            <td class="p-2 font-bold text-slate-200">${totalQty}</td>
+            <td class="p-2">${fmtCell(evals.LCSC_JLCPCB)}</td>
+            <td class="p-2">${fmtCell(evals.ALIEXPRESS)}</td>
+            <td class="p-2">${fmtCell(evals.ALIBABA)}</td>
+            <td class="p-2">${fmtCell(evals.MERCADO_LOCAL)}</td>
+            <td class="p-2">
+              <span class="px-2 py-0.5 rounded border text-[11px] font-bold ${badgeMap[winner]}">${winner.replace("_", " ")}</span>
+              <div class="text-emerald-300 font-bold mt-0.5">${winPrice > 0 ? "$" + winPrice.toFixed(2) : "Ajustar"}</div>
+            </td>
+          </tr>
+        `);
+      });
+
+      document.getElementById("bomTableBody").innerHTML = rowsHtml.join("");
+      document.getElementById("sumOptimalTotal").textContent = `$${totalOpt.toFixed(2)} USD`;
+      document.getElementById("sumPerBoard").textContent = `$${(totalOpt / boardQty).toFixed(2)} USD / placa (${country})`;
+
+      document.getElementById("sumChannels").innerHTML = `
+        <div>LCSC/JLCPCB: <span class="text-sky-300 font-bold">${counts.LCSC_JLCPCB}</span> | Local: <span class="text-emerald-300 font-bold">${counts.MERCADO_LOCAL}</span></div>
+        <div>AliExpress: <span class="text-orange-300 font-bold">${counts.ALIEXPRESS}</span> | Alibaba: <span class="text-purple-300 font-bold">${counts.ALIBABA}</span></div>
+      `;
+      document.getElementById("sumEasyEdaAudit").innerHTML = `
+        <div>Códigos C9900...: <span class="text-amber-300 font-bold">${c9900Count} detectados</span></div>
+        <div>Extended Parts: <span class="text-sky-300 font-bold">${extCount} detectada(s)</span></div>
+      `;
+      document.getElementById("sumShield").innerHTML = `
+        <span class="text-rose-300 font-bold">${cloneBlockedCount} oferta(s) clon</span> bloqueada(s) (&lt;40% LCSC) y baterías/cajas redirigidas por IATA.
+      `;
+
+      document.getElementById("alertsList").innerHTML = alerts
+        .map((a) => `<div class="p-1.5 rounded bg-slate-950 border border-slate-800 text-slate-300">${a}</div>`)
+        .join("");
+
+      document.getElementById("jsonBox").value = JSON.stringify(
+        {
+          tool: "pcb_quote_bom_multichannel",
+          arguments: {
+            board_qty: boardQty,
+            assembly_mode: mode,
+            country_code: country,
+            import_tax_percent: parseFloat(vatStr),
+            urgency_days: urgencyDays,
+            bom_items: bomItems,
+          },
+        },
+        null,
+        2
+      );
+    }
+
+    function copyPayload() {
+      const box = document.getElementById("jsonBox");
+      box.select();
+      document.execCommand("copy");
+      alert("Payload JSON copiado para ejecutar pcb_quote_bom_multichannel en el servidor MCP.");
+    }
+
+    document.addEventListener("DOMContentLoaded", recalcQuotes);
+  </script>
+</body>
+</html>

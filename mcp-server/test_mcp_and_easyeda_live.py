@@ -127,6 +127,54 @@ def test_normative_calculators() -> None:
     assert 48.0 <= si_jlc["z0_characteristic_ohm"] <= 58.0
     print(f"  [OK] Stackup JLCPCB (JLC04161H-3313, W=0.16mm): Z0={si_jlc['z0_characteristic_ohm']} Ω, Zdiff={si_jlc['z_differential_ohm']} Ω")
 
+    # 1.9 Asistente Cotizador Multicanal (LCSC, AliExpress, Alibaba y Mercado Local sobre MMCALL-PROT-12V)
+    sample_bom = [
+        {
+            "reference": "J1",
+            "mpn": "DC-005-5.5*2.1",
+            "footprint": "DC-IN-TH",
+            "lcsc": "C9900017044",  # Huella comunitaria -> no comprable en LCSC
+            "qty_per_board": 1,
+            "lcsc_quote": {"unit_usd": 0.08, "shipping_share_usd": 0.5, "in_stock": True, "lead_days": 12},
+            "aliexpress_quote": {"unit_usd": 0.06, "shipping_usd": 1.80, "store_rating_pct": 97.4, "item_stars": 4.8, "lead_days": 18},
+            "local_market_quote": {"unit_usd": 0.45, "shipping_usd": 1.50, "vendor_name": "MCI/AFEL Local", "has_tax_invoice": True, "lead_days": 1},
+        },
+        {
+            "reference": "D1",
+            "mpn": "SMBJ15CA",
+            "footprint": "SMB",
+            "lcsc": "C8829",
+            "qty_per_board": 1,
+            "is_critical_ic": True,
+            "jlcpcb_class": "Extended Part",
+            "lcsc_quote": {"unit_usd": 0.075, "shipping_share_usd": 0.8, "in_stock": True, "lead_days": 10},
+            "aliexpress_quote": {"unit_usd": 0.020, "shipping_usd": 1.50, "store_rating_pct": 96.2, "item_stars": 4.8, "lead_days": 19},  # <40% -> Clon!
+            "local_market_quote": {"unit_usd": 0.55, "shipping_usd": 1.00, "vendor_name": "Local", "has_tax_invoice": True, "lead_days": 2},
+        },
+        {
+            "reference": "ENC1",
+            "mpn": "Gabinete IP65 + Bateria",
+            "footprint": "EXT",
+            "lcsc": "",
+            "qty_per_board": 1,
+            "category": "battery_hazmat",
+            "alibaba_quote": {"unit_usd": 2.90, "shipping_usd": 65.0, "moq": 50, "verified_supplier": True, "trade_assurance": True, "lead_days": 32},
+            "local_market_quote": {"unit_usd": 7.20, "shipping_usd": 3.50, "vendor_name": "Distribuidor Local", "has_tax_invoice": True, "lead_days": 2},
+        },
+    ]
+    q_normal = mcp.quote_bom_multichannel(bom_items=sample_bom, board_qty=5, assembly_mode="manual_lab", country_code="CL", import_tax_percent=19.0, urgency_days=20)
+    assert q_normal["summary"]["easyeda_community_c9900_parts_count"] == 1
+    # J1 (C9900) no puede elegir LCSC; D1 en AliExpress (<40%) debe ser bloqueado por clon y elegir LCSC; ENC1 elige MERCADO_LOCAL
+    assert q_normal["items"][0]["recommended_channel"] in ("ALIEXPRESS", "MERCADO_LOCAL")
+    assert q_normal["items"][1]["recommended_channel"] == "LCSC_JLCPCB"
+    assert q_normal["items"][2]["recommended_channel"] == "MERCADO_LOCAL"
+    print(f"  [OK] Cotizador Multicanal (Normal 20d): Canasta Híbrida=${q_normal['summary']['optimal_hybrid_total_usd']} USD ({q_normal['summary']['channel_distribution']})")
+
+    # Caso Urgencia Laboratorio <= 3 días -> todo debe ir a MERCADO_LOCAL
+    q_urgent = mcp.quote_bom_multichannel(bom_items=sample_bom, board_qty=2, assembly_mode="manual_lab", country_code="CL", import_tax_percent=19.0, urgency_days=3)
+    assert q_urgent["summary"]["channel_distribution"]["MERCADO_LOCAL"] == 3
+    print(f"  [OK] Cotizador Multicanal (Urgencia <=3d): 100% redirigido a MERCADO_LOCAL (${q_urgent['summary']['optimal_hybrid_total_usd']} USD en 24-48h con factura).")
+
 
 def test_stdio_jsonrpc_protocol() -> None:
     print("\n=== 2. Probando Protocolo MCP JSON-RPC 2.0 sobre STDIO ===")

@@ -859,6 +859,216 @@ def verify_connection_board(
     }
 
 
+def quote_bom_multichannel(
+    bom_items: List[Dict[str, Any]],
+    board_qty: int = 5,
+    assembly_mode: str = "hybrid",
+    country_code: str = "CL",
+    import_tax_percent: float = 19.0,
+    urgency_days: int = 25,
+    jlcpcb_extended_fee_usd: float = 3.0,
+) -> Dict[str, Any]:
+    """
+    Motor Cotizador y Auditor Multicanal de Componentes (EasyEDA Pro/LCSC/JLCPCB,
+    AliExpress, Alibaba y Mercado Local):
+    - Detecta códigos comunitarios C9900... de EasyEDA Pro (no ensamblables en JLCPCB PCBA).
+    - Detecta encapsulados 0201/0402 incompatibles con soldadura manual de laboratorio.
+    - Detecta riesgo de falsificación/remarcado en ICs críticos (<40% del precio LCSC).
+    - Detecta restricciones aéreas IATA (baterías LiPo/18650, químicos, gabinetes pesados) -> prioriza Mercado Local.
+    - Calcula el Costo Total Puesto en Laboratorio (Landed Cost con envío, MOQ, fees Extended e impuestos)
+      y selecciona la Canasta Híbrida Óptima respetando el plazo máximo (urgency_days).
+    """
+    if board_qty <= 0:
+        raise ValueError("board_qty debe ser mayor que 0.")
+
+    tax_mult = 1.0 + max(0.0, import_tax_percent) / 100.0
+    item_reports: List[Dict[str, Any]] = []
+    global_alerts: List[str] = []
+
+    total_optimal_usd = 0.0
+    total_all_local_usd = 0.0
+    total_all_lcsc_usd = 0.0
+    channel_counts: Dict[str, int] = {"LCSC_JLCPCB": 0, "ALIEXPRESS": 0, "ALIBABA": 0, "MERCADO_LOCAL": 0, "SIN_OFERTA_VALIDA": 0}
+    extended_parts_count = 0
+    community_parts_count = 0
+
+    for item in bom_items:
+        ref = str(item.get("reference", "?")).strip()
+        mpn = str(item.get("mpn") or item.get("value") or "Componente").strip()
+        footprint = str(item.get("footprint", "")).strip()
+        lcsc = str(item.get("lcsc", "")).strip()
+        qty_per_board = max(1, int(item.get("qty_per_board") or item.get("quantity") or 1))
+        total_qty = qty_per_board * board_qty
+        is_critical_ic = bool(item.get("is_critical_ic", False))
+        category = str(item.get("category", "general")).lower()
+        jlcpcb_class = str(item.get("jlcpcb_class", "Unknown")).strip()
+
+        item_warnings: List[str] = []
+        is_community_lcsc = lcsc.upper().startswith("C9900")
+        if is_community_lcsc:
+            community_parts_count += 1
+            item_warnings.append(
+                f"Código '{lcsc}' es una huella comunitaria (User Contributed) en EasyEDA Pro: NO existe en almacén LCSC/JLCPCB PCBA. "
+                "Reemplace por código LCSC real o compre en Mercado Local / AliExpress."
+            )
+
+        if assembly_mode == "manual_lab" and any(pkg in footprint.upper() for pkg in ["0201", "0402", "BGA", "WLCSP"]):
+            item_warnings.append(
+                f"Encapsulado '{footprint}' es de alta dificultad para soldadura manual en laboratorio. "
+                "Considere migrar a 0805/0603/SOIC (IPC-7351B Nivel A) o pedir PCBA."
+            )
+
+        is_air_restricted = category in ("battery_hazmat", "chemical", "enclosure_heavy")
+        if is_air_restricted:
+            item_warnings.append(
+                f"Categoría '{category}' presenta restricciones IATA o sobrecosto volumétrico en correo aéreo internacional: priorizar Mercado Local (o Alibaba DDP marítimo en volumen)."
+            )
+
+        candidates: Dict[str, Dict[str, Any]] = {}
+        lcsc_ref_unit: Optional[float] = None
+
+        # 1. Evaluar LCSC / JLCPCB
+        q_lcsc = item.get("lcsc_quote")
+        if isinstance(q_lcsc, dict) and not is_community_lcsc and q_lcsc.get("in_stock", True):
+            u_price = float(q_lcsc.get("unit_usd", 0.0))
+            lcsc_ref_unit = u_price
+            ship_share = float(q_lcsc.get("shipping_share_usd", 0.0))
+            ext_fee = jlcpcb_extended_fee_usd if (assembly_mode == "jlcpcb_pcba" and "extended" in jlcpcb_class.lower()) else 0.0
+            if ext_fee > 0:
+                extended_parts_count += 1
+                item_warnings.append(
+                    f"Pieza clasificada como 'Extended Part' en JLCPCB (+${ext_fee:.2f} USD fee de carrete). Busque equivalente 'Basic Part' con easyeda_schematic_search_device."
+                )
+            landed = ((total_qty * u_price) + ship_share + ext_fee) * tax_mult
+            lead_d = int(q_lcsc.get("lead_days", 10))
+            candidates["LCSC_JLCPCB"] = {
+                "landed_total_usd": round(landed, 2),
+                "effective_unit_usd": round(landed / total_qty, 4),
+                "lead_days": lead_d,
+                "eligible": (lead_d <= urgency_days) and (not is_air_restricted),
+                "notes": f"LCSC {lcsc} ({jlcpcb_class}), fee Extended=${ext_fee:.2f}",
+            }
+            total_all_lcsc_usd += landed
+
+        # 2. Evaluar AliExpress
+        q_ali = item.get("aliexpress_quote")
+        if isinstance(q_ali, dict):
+            u_price = float(q_ali.get("unit_usd", 0.0))
+            ship = float(q_ali.get("shipping_usd", 0.0))
+            rating = float(q_ali.get("store_rating_pct", 96.0))
+            stars = float(q_ali.get("item_stars", 4.8))
+            lead_d = int(q_ali.get("lead_days", 18))
+            counterfeit_risk = bool(is_critical_ic and lcsc_ref_unit and lcsc_ref_unit > 0 and u_price < 0.40 * lcsc_ref_unit)
+            reputation_ok = (rating >= 95.0 and stars >= 4.7)
+
+            if counterfeit_risk:
+                item_warnings.append(
+                    f"ALERTA ANTI-CLON en AliExpress: precio ${u_price:.3f} es <40% del oficial LCSC (${lcsc_ref_unit:.3f}) en IC crítico '{mpn}'. Descartado."
+                )
+            if not reputation_ok:
+                item_warnings.append(
+                    f"Tienda AliExpress descartada por baja reputación ({rating}% positivo, {stars}★; mínimo exigido >=95% y >=4.7★)."
+                )
+
+            landed = ((total_qty * u_price) + ship) * tax_mult
+            candidates["ALIEXPRESS"] = {
+                "landed_total_usd": round(landed, 2),
+                "effective_unit_usd": round(landed / total_qty, 4),
+                "lead_days": lead_d,
+                "eligible": reputation_ok and (not counterfeit_risk) and (lead_d <= urgency_days) and (assembly_mode != "jlcpcb_pcba"),
+                "notes": f"Rating {rating}% / {stars}★, envío ${ship:.2f}",
+            }
+
+        # 3. Evaluar Alibaba (Mayorista / OEM)
+        q_baba = item.get("alibaba_quote")
+        if isinstance(q_baba, dict):
+            u_price = float(q_baba.get("unit_usd", 0.0))
+            ship = float(q_baba.get("shipping_usd", 0.0))
+            moq = max(1, int(q_baba.get("moq", 1)))
+            verified = bool(q_baba.get("verified_supplier", False))
+            assurance = bool(q_baba.get("trade_assurance", False))
+            lead_d = int(q_baba.get("lead_days", 22))
+            billed_qty = max(total_qty, moq)
+            landed = ((billed_qty * u_price) + ship) * tax_mult
+
+            if not (verified and assurance):
+                item_warnings.append("Proveedor Alibaba sin sello completo Verified Supplier + Trade Assurance: descartado por seguridad.")
+
+            candidates["ALIBABA"] = {
+                "landed_total_usd": round(landed, 2),
+                "effective_unit_usd": round(landed / total_qty, 4),
+                "billed_qty_by_moq": billed_qty,
+                "lead_days": lead_d,
+                "eligible": verified and assurance and (lead_d <= urgency_days) and (assembly_mode != "jlcpcb_pcba"),
+                "notes": f"MOQ {moq} uds (compra real {billed_qty} uds), Verified+TradeAssurance={verified and assurance}",
+            }
+
+        # 4. Evaluar Mercado Local (Tiendas nacionales / Distribuidor local / Entrega 24-72h con factura)
+        q_loc = item.get("local_market_quote")
+        if isinstance(q_loc, dict):
+            u_price = float(q_loc.get("unit_usd", 0.0))
+            ship = float(q_loc.get("shipping_usd", 0.0))
+            lead_d = int(q_loc.get("lead_days", 2))
+            vendor = str(q_loc.get("vendor_name", f"Proveedor Local ({country_code})"))
+            invoice = bool(q_loc.get("has_tax_invoice", True))
+            # En mercado local el precio suele incluir o facturar IVA local directamente
+            landed = (total_qty * u_price) + ship
+            candidates["MERCADO_LOCAL"] = {
+                "landed_total_usd": round(landed, 2),
+                "effective_unit_usd": round(landed / total_qty, 4),
+                "lead_days": lead_d,
+                "eligible": (lead_d <= urgency_days) and (assembly_mode != "jlcpcb_pcba"),
+                "notes": f"{vendor} ({country_code}), entrega {lead_d}d, Factura fiscal={'Sí' if invoice else 'No'}",
+            }
+            total_all_local_usd += landed
+
+        # Seleccionar el canal elegible de menor Costo Total Puesto en Laboratorio
+        eligible_channels = [(ch, data) for ch, data in candidates.items() if data.get("eligible")]
+        if eligible_channels:
+            best_ch, best_data = min(eligible_channels, key=lambda kv: kv[1]["landed_total_usd"])
+            channel_counts[best_ch] += 1
+            total_optimal_usd += float(best_data["landed_total_usd"])
+        else:
+            best_ch = "SIN_OFERTA_VALIDA"
+            best_data = None
+            channel_counts["SIN_OFERTA_VALIDA"] += 1
+            global_alerts.append(
+                f"Ítem {ref} ({mpn}): ningún canal cumplió plazo <= {urgency_days} días y reglas de autenticidad/ensamblaje."
+            )
+
+        item_reports.append({
+            "reference": ref,
+            "mpn": mpn,
+            "footprint": footprint,
+            "lcsc": lcsc,
+            "total_qty_needed": total_qty,
+            "recommended_channel": best_ch,
+            "recommended_quote": best_data,
+            "all_channel_evaluations": candidates,
+            "warnings": item_warnings,
+        })
+
+    return {
+        "project_parameters": {
+            "board_qty": board_qty,
+            "assembly_mode": assembly_mode,
+            "country_code": country_code,
+            "import_tax_percent": import_tax_percent,
+            "urgency_days": urgency_days,
+        },
+        "summary": {
+            "total_bom_lines": len(bom_items),
+            "optimal_hybrid_total_usd": round(total_optimal_usd, 2),
+            "optimal_cost_per_board_usd": round(total_optimal_usd / board_qty, 2),
+            "channel_distribution": channel_counts,
+            "jlcpcb_extended_parts_count": extended_parts_count,
+            "easyeda_community_c9900_parts_count": community_parts_count,
+        },
+        "global_alerts": global_alerts,
+        "items": item_reports,
+    }
+
+
 # ============================================================================
 # 2. SERVIDOR MCP JSON-RPC 2.0 (STDIO)
 # ============================================================================
@@ -1004,6 +1214,23 @@ TOOLS_SCHEMA = [
             "required": ["board_width_mm", "board_height_mm", "devices", "connections"],
         },
     },
+    {
+        "name": "pcb_quote_bom_multichannel",
+        "description": "Asistente Cotizador y Auditor Multicanal de BOM (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local): calcula Costo Total Puesto en Laboratorio (envío, MOQ, impuestos, fees Extended), detecta códigos comunitarios C9900..., bloquea chips sospechosos de clon (<40% LCSC), evalúa urgencia (24-72h local vs importación) y arma la Canasta Híbrida Óptima.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "bom_items": {"type": "array", "items": {"type": "object"}, "description": "Ítems del BOM (reference, mpn, footprint, lcsc, qty_per_board, is_critical_ic, jlcpcb_class, category y cotizaciones por canal)."},
+                "board_qty": {"type": "integer", "default": 5},
+                "assembly_mode": {"type": "string", "enum": ["manual_lab", "jlcpcb_pcba", "hybrid"], "default": "hybrid"},
+                "country_code": {"type": "string", "default": "CL"},
+                "import_tax_percent": {"type": "number", "default": 19.0},
+                "urgency_days": {"type": "integer", "default": 25},
+                "jlcpcb_extended_fee_usd": {"type": "number", "default": 3.0},
+            },
+            "required": ["bom_items"],
+        },
+    },
 ]
 
 
@@ -1041,6 +1268,8 @@ def handle_tool_call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             chamfer_mm=args.get("chamfer_mm", 0.0),
             origin_mil=(float(orig[0]), float(orig[1])),
         )
+    if name == "pcb_quote_bom_multichannel":
+        return quote_bom_multichannel(**args)
     raise ValueError(f"Herramienta desconocida: {name}")
 
 
@@ -1068,7 +1297,7 @@ def run_stdio_server() -> None:
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "agent-design-pcb-mcp",
-                        "version": "4.3.0",
+                        "version": "4.4.0",
                     },
                 },
             }

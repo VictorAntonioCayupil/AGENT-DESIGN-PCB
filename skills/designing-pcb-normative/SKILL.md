@@ -3,11 +3,11 @@ name: designing-pcb-normative
 description: Use when designing electronic circuits, microcontroller hardware (ESP32, STM32, RP2040, AVR), circuit protection, schematics, BOM sourcing (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba), JLCPCB stackups, RF antennas, or PCB layouts, or when operating EasyEDA Pro MCP tools (easyeda-mcp-pro + agent-design-pcb) to search devices, simulate SPICE, route, audit ERC/DRC, generate 3D/Gerbers, or bring up hardware boards under IPC and IEC standards.
 ---
 
-# Agente Ingeniero Electrónico Acoplado a EasyEDA Pro (`designing-pcb-normative` v4.3)
+# Agente Ingeniero Electrónico Acoplado a EasyEDA Pro (`designing-pcb-normative` v4.4)
 
 > **Desarrollado por S&D MMCALL para la comunidad.**  
-> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior Acoplado Nativamente a EasyEDA Pro (v2.3 / v3.2.x) y al Ecosistema LCSC / JLCPCB**, combinando física real y normas internacionales (**IPC / IEC / J-STD / ANSI**) con el servidor MCP normativo **`agent-design-pcb-mcp`** (8 motores deterministas) y el puente CAD **`easyeda-mcp-pro`** (autor: `oaslananka`, licencia `AGPL-3.0-only`).  
-> **Lectura clave de acoplamiento EasyEDA Pro:** [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md).
+> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior Acoplado Nativamente a EasyEDA Pro (v2.3 / v3.2.x) + Asistente Cotizador Multicanal (LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**, combinando física real y normas internacionales (**IPC / IEC / J-STD / ANSI**) con el servidor MCP normativo **`agent-design-pcb-mcp`** (9 motores deterministas) y el puente CAD **`easyeda-mcp-pro`** (autor: `oaslananka`, licencia `AGPL-3.0-only`).  
+> **Lectura clave de acoplamiento EasyEDA Pro:** [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md), [references/06-copiloto-easyeda-sourcing-global.md](references/06-copiloto-easyeda-sourcing-global.md) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md).
 
 ## 1. Principios Fundamentales y Ventajas Nativas de EasyEDA Pro
 
@@ -75,12 +75,14 @@ digraph pcb_easyedapro_v43_flow {
    * Simule circuitos analógicos/potencia con `easyeda_simulate_operating_point` y `easyeda_simulate_transient`.
    * Cierre con `easyeda_project_commit_transaction`.
 
-### Fase 3: Optimización Nativa BOM LCSC / JLCPCB, Sourcing Global, Térmica y Aislamiento HV
+### Fase 3: Asistente Cotizador Multicanal (LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local), Térmica y HV
 1. **Lea obligatoriamente:** [references/06-copiloto-easyeda-sourcing-global.md](references/06-copiloto-easyeda-sourcing-global.md) y [references/02-termica-aislamiento-materiales.md](references/02-termica-aislamiento-materiales.md).
-2. **Explote el Ecosistema BOM + Cotización Integrada de EasyEDA Pro (`BOM-SOURCING.md`):**
-   * Ejecute `easyeda_bom_generate` $\rightarrow$ `easyeda_bom_validate` $\rightarrow$ `easyeda_bom_sourcing` $\rightarrow$ `easyeda_bom_quality_report` $\rightarrow$ `easyeda_jlcpcb_quote_workflow`.
-   * Convierta componentes pasivos/discretos *Extended* a **JLCPCB Basic Parts** para eliminar cargos de carga de carrete.
-   * Si el usuario compra aparte en **AliExpress / Alibaba**, audite reputación ($\ge 95\%$, $\ge 4.7\star$, *Verified Supplier*), *Landed Cost* y riesgo de chips falsos ($<40\%$ del precio LCSC).
+2. **Ejecute el Asistente Cotizador de 4 Canales (`BOM-SOURCING.md` + `BOM-QUOTER-WORKBENCH.template.html`):**
+   * **Canal 1 — EasyEDA Pro / LCSC / JLCPCB:** Extraiga el BOM con `easyeda_bom_generate` y consulte `JLCPCB Part Class` (`Basic` vs `Extended`) y `Datasheet` con `easyeda_schematic_search_device`. Detecte códigos comunitarios **`C9900...`** (no comprables en LCSC PCBA) y reemplace *Extended Parts* por **Basic Parts** para ahorrar \$3 USD/carrete.
+   * **Canal 2 — AliExpress:** Busque con `search_web` (`domain: "aliexpress.com"`) / `browser`. Exija tienda $\ge 95\%$, $\ge 4.7\star$ y bloquee ICs críticos con precio $<40\%$ de LCSC (riesgo de clon).
+   * **Canal 3 — Alibaba:** Busque con `search_web` (`domain: "alibaba.com"`) / `browser`. Exija **`Verified Supplier`** (SGS/TÜV) + **`Trade Assurance`**, evalúe MOQ real y solicite plano 2D/STEP antes de cerrar Gerbers.
+   * **Canal 4 — Mercado Local (Tiendas nacionales / MercadoLibre / Distribuidor local):** Priorícelo ante urgencia ($\le 72\,\text{h}$), necesidad de factura fiscal local o restricciones aéreas IATA (**baterías 18650/LiPo/plomo**, químicos, cajas IP65/DIN pesadas).
+   * Ejecute **`pcb_quote_bom_multichannel`** (`agent-design-pcb-mcp`) para calcular el *Total Landed Cost* (envío + MOQ + impuestos/IVA + fees) y recomendar la **Canasta Híbrida Óptima**.
 3. **Calcule Térmica y Aislamiento con `agent-design-pcb-mcp`:**
    * `pcb_normative_trace_calculator` (**IPC-2221 / IPC-2152**) y `pcb_normative_thermal_vias` (Fourier + **IPC-6012**).
    * `pcb_normative_clearance_creepage` (**IPC-2221C B2** + **IEC 60664-1** usando $V_{\text{peak}}$; para $230\,\text{V}_{\text{RMS}} \rightarrow 325\,\text{V}_{\text{peak}} \ge 2.50\,\text{mm}$ + *Board Cutout* $>1.5\,\text{mm}$).

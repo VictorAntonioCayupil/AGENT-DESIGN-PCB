@@ -159,6 +159,19 @@ flowchart TD
 
 ---
 
+### 3.9. `pcb_quote_bom_multichannel` (Asistente Cotizador LCSC/JLCPCB + AliExpress + Alibaba + Mercado Local)
+* **Propósito:** Calcular de forma determinista el **Costo Total Puesto en Laboratorio (*Total Landed Cost*)** por ítem y para el lote completo (`board_qty`), armando la **Canasta Híbrida Óptima** entre los 4 canales de compra.
+* **Entradas:**
+  * `bom_items` (list): Ítems extraídos de `easyeda_bom_generate` enriquecidos con `jlcpcb_class` (leído con `easyeda_schematic_search_device`) y cotizaciones por canal (`lcsc_quote`, `aliexpress_quote`, `alibaba_quote`, `local_market_quote`).
+  * `board_qty`, `assembly_mode` (`manual_lab` / `jlcpcb_pcba` / `hybrid`), `country_code`, `import_tax_percent`, `urgency_days`, `jlcpcb_extended_fee_usd`.
+* **Auditorías Automáticas Integradas:**
+  1. Detecta códigos comunitarios **`C9900...`** de EasyEDA Pro (no comprables en LCSC/JLCPCB PCBA) y los redirige a Mercado Local o AliExpress.
+  2. Detecta paquetes `0201`/`0402`/BGA incompatibles con soldadura manual (`manual_lab`).
+  3. Bloquea ofertas sospechosas de falsificación en AliExpress (`unit_usd < 0.40 * lcsc_unit_usd` en ICs críticos o tiendas $<95\%$ / $<4.7\star$) y proveedores de Alibaba sin `Verified Supplier + Trade Assurance`.
+  4. Prioriza **Mercado Local** ante urgencias ($\le 3$ días) o ítems con restricción aérea IATA (`battery_hazmat`, `chemical`, `enclosure_heavy`).
+
+---
+
 ## 4. Protocolo de Diagnóstico y Reparación de Errores DRC en EasyEDA Pro
 
 Al interactuar con EasyEDA Pro 3.2.x, el agente debe seguir rigurosamente este protocolo de 4 etapas para diagnosticar y subsanar discrepancias en las reglas de diseño (DRC):
