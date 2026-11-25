@@ -63,11 +63,20 @@ Mientras que la norma **IEC 61000-4-2** (ESD) evalúa pulsos muy cortos ($0.8\,\
 
 ---
 
-## 4. Filtrado de Interferencia Electromagnética (EMI) en Entradas y Salidas
+## 4. Filtrado de Interferencia Electromagnética (EMI) y Estabilidad de Middlebrook
 
-1. **Filtro $\pi$ ($C_1 - L - C_2$) o Filtro con Perla de Ferrita (*Ferrite Bead*) en Alimentación:**
-   * Seleccione la perla de ferrita por su **impedancia en ohmios a $100\,\text{MHz}$** (ej. $600\,\Omega @ 100\,\text{MHz}$) y asegure que su corriente nominal ($I_{\text{DC}}$) sea al menos **$1.5\times$ la corriente máxima del riel** para evitar la saturación magnética del núcleo.
-2. **Choque de Modo Común (*Common-Mode Choke*) en Cables Largos:**
+1. **Filtro $\pi$ ($C_1 - L_f - C_2$) en Entradas de Fuentes Conmutadas:**
+   * La frecuencia de corte del filtro debe ser al menos una década inferior a la frecuencia de conmutación:
+     $$f_c = \frac{1}{2\pi \sqrt{L_f \cdot C_2}} \le 0.1 \cdot f_{sw}$$
+   * La atenuación a $f_{sw}$ debe satisfacer el déficit espectral detectado contra **CISPR 32 Clase B** o **CISPR 25 Clase 5** con al menos $6\,\text{dB}$ de margen.
+2. **Criterio de Estabilidad de Impedancia de Middlebrook:**
+   * Las fuentes conmutadas presentan resistencia incremental de entrada negativa ($R_{in} \approx -V_{in}^2 / P_{in}$). Si el filtro de entrada presenta una impedancia de salida en resonancia $|Z_{out,\text{filter}}| \ge |R_{in}|$, el sistema entrará en oscilación espontánea y apagado cíclico.
+   * **Regla obligatoria:** Agregue una rama amortiguadora en paralelo con $C_2$ consistente en $C_d = 4 \cdot C_2$ en serie con una resistencia $R_d \approx 0.6 \cdot \sqrt{L_f / C_2}$.
+   * Verifique siempre que $|Z_{out,\text{filter}}|_{\max} \le \frac{1}{3} |R_{in}|$ (separación $\ge 9.5\,\text{dB}$).
+3. **Auditoría Pre-Compliance Automatizada:**
+   * Ejecute la herramienta MCP `pcb_emc_precompliance_auditor` antes de cerrar el esquemático para obtener los valores comerciales de $L_f$, $C_1$, $C_2$, $C_d$ y $R_d$.
+   * Para diseño detallado de campos radiados, lazos calientes y resonancias de cavidad, consulte el **[Manual 16: Auditoría EMC/EMI Pre-Compliance y Filtros Industriales](16-auditoria-emc-emi-precompliance-y-filtros-industriales.md)**.
+4. **Choque de Modo Común (*Common-Mode Choke*) en Cables Largos:**
    * En entradas DC por cable externo, puertos USB, CAN o RS-485, instale una bobina de choque de modo común junto al conector para presentar alta impedancia al ruido en fase sin atenuar la señal diferencial ni la corriente continua.
 
 ---

@@ -208,6 +208,67 @@ def test_normative_calculators() -> None:
     assert any("Anti Back-Powering" in rec for rec in ulp_backpower["mandatory_hardware_checks"])
     print("  [OK] Matriz de Seguridad de Pines de 3 Niveles (v4.6) validada (Flash, Octal, Input-Only, Walter y Back-Powering).")
 
+    # 1.12 Auditor y Calculador de Pares Diferenciales de Alta Velocidad (v4.7 - IPC-2141A / IEEE 802.3)
+    diff_usb2 = mcp.calc_high_speed_diff_pairs(
+        protocol="usb2",
+        topology="microstrip",
+        dielectric_h_mm=0.10,
+        er=4.05,
+        copper_oz=1.0,
+        trace_length_pos_mm=45.0,
+        trace_length_neg_mm=45.08,  # delta = 0.08 mm = 3.15 mils < 5 mils -> PASS
+        crosses_split_plane=False,
+    )
+    assert diff_usb2["impedance_results"]["impedance_verdict"] == "PASS"
+    assert diff_usb2["skew_audit"]["verdict"] == "PASS"
+    assert 85.0 <= diff_usb2["impedance_results"]["z_differential_ohm"] <= 95.0
+    assert diff_usb2["reference_plane_audit"]["verdict"] == "PASS"
+    print(f"  [OK] Pares Diferenciales USB2_HS: Zdiff={diff_usb2['impedance_results']['z_differential_ohm']} Ω, Skew={diff_usb2['skew_audit']['delta_length_mil']} mils.")
+
+    # Violación de Skew (>5 mils) y Split Plane
+    diff_bad = mcp.calc_high_speed_diff_pairs(
+        protocol="usb2",
+        dielectric_h_mm=0.10,
+        er=4.05,
+        trace_length_pos_mm=45.0,
+        trace_length_neg_mm=45.25,  # delta = 0.25 mm = 9.84 mils > 5 mils -> FAIL
+        crosses_split_plane=True,    # Cruce de plano dividido -> Bloqueante EMC
+    )
+    assert diff_bad["skew_audit"]["verdict"] == "FAIL"
+    assert diff_bad["reference_plane_audit"]["verdict"] == "CRITICAL_VIOLATION"
+    print("  [OK] Pares Diferenciales detectó y bloqueó violación de Split Plane y exceso de Skew (>5 mils).")
+
+    # 1.13 Auditor Normativo EMC Pre-Compliance y Filtros Industriales (v4.7 - CISPR 32 / Middlebrook)
+    emc_buck = mcp.calc_emc_precompliance_audit(
+        vin_v=12.0,
+        vout_v=3.3,
+        iout_a=1.5,
+        fsw_khz=500.0,
+        hot_loop_area_mm2=25.0,
+        trise_ns=5.0,
+        emc_standard="CISPR_32_CLASS_B",
+    )
+    assert emc_buck["compliance_summary"]["verdict"] in ("PASS", "PASS_WITH_PI_FILTER")
+    assert emc_buck["pi_filter_design"]["damping_network"]["stability_verdict"] in ("EXCELLENT_STABILITY", "STABLE")
+    assert emc_buck["pi_filter_design"]["damping_network"]["middlebrook_margin_db"] >= 9.5
+    print(f"  [OK] Auditor EMC Pre-Compliance: Filtro Pi con Damping Network cumple Middlebrook (Margen={emc_buck['pi_filter_design']['damping_network']['middlebrook_margin_db']} dB >= 9.5 dB).")
+
+    # 1.14 Generador 3D Industrial, Exploded View y Knolling Flat-Lay (v4.7)
+    sample_3d_devices = [
+        {"designator": "U1", "name": "XIAO ESP32-C5", "footprint": "XIAO-C5-SMD", "x_mm": 26.0, "y_mm": 19.0, "height_mm": 4.5, "category": "ic"},
+        {"designator": "M1", "name": "SIM7080G Cat-M/NB-IoT", "footprint": "SIM7080G-LCC", "x_mm": 26.0, "y_mm": 28.0, "height_mm": 2.4, "category": "module_rf"},
+        {"designator": "SW1", "name": "Boton Emergencia E3", "footprint": "SW-PB-12MM", "x_mm": 26.0, "y_mm": 10.0, "height_mm": 7.5, "category": "switch"},
+    ]
+    showcase = mcp.generate_3d_showcase(
+        board_dimensions={"width_mm": 52.0, "height_mm": 38.0, "thickness_mm": 1.6},
+        components=sample_3d_devices,
+        showcase_mode="all",
+    )
+    assert showcase["status"] == "SUCCESS"
+    assert len(showcase["exploded_view"]["components"]) == 3
+    assert len(showcase["knolling_view"]["items"]) == 3
+    print(f"  [OK] Generador 3D Industrial: Exploded View ({len(showcase['exploded_view']['components'])} componentes z), Knolling ({len(showcase['knolling_view']['items'])} piezas en matriz) generadas.")
+
 
 def test_stdio_jsonrpc_protocol() -> None:
     print("\n=== 2. Probando Protocolo MCP JSON-RPC 2.0 sobre STDIO ===")
@@ -225,14 +286,15 @@ def test_stdio_jsonrpc_protocol() -> None:
         proc.stdin.flush()
         init_out = json.loads(proc.stdout.readline())
         assert init_out["result"]["serverInfo"]["name"] == "agent-design-pcb-mcp"
+        assert init_out["result"]["serverInfo"]["version"] == "4.7.0"
 
         # 2. tools/list
         proc.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}) + "\n")
         proc.stdin.flush()
         list_out = json.loads(proc.stdout.readline())
         tools = list_out["result"]["tools"]
-        assert len(tools) >= 7
-        print(f"  [OK] MCP stdio server inicializado y expone {len(tools)} herramientas normativas.")
+        assert len(tools) == 12
+        print(f"  [OK] MCP stdio server inicializado (v4.7.0) y expone {len(tools)} herramientas normativas deterministas.")
 
         # 3. tools/call
         proc.stdin.write(json.dumps({

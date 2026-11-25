@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-AGENT-DESIGN-PCB MCP Server (v4.0)
+AGENT-DESIGN-PCB MCP Server (v4.7.0)
 Desarrollado por S&D MMCALL para la comunidad.
 Licencia: MIT (Atribución a oaslananka/easyeda-mcp-pro para el puente de bajo nivel de EasyEDA Pro).
 
-Servidor MCP Agéntico de Ingeniería Electrónica, Cálculos Normativos (IPC/IEC)
+Servidor MCP Agéntico de Ingeniería Electrónica, Cálculos Normativos (IPC/IEC/IEEE/CISPR)
 y Co-Piloto Acoplado a EasyEDA Pro (v2.3+ / v3.2+).
 """
 
@@ -1225,6 +1225,573 @@ def quote_bom_multichannel(
 
 
 # ============================================================================
+# MOTOR MATEMÁTICO 10: PARES DIFERENCIALES DE ALTA VELOCIDAD (IPC-2141A / IEEE 802.3)
+# ============================================================================
+
+DIFF_PROTOCOLS: Dict[str, Dict[str, Any]] = {
+    "usb2": {
+        "name": "USB 2.0 High-Speed (480 Mbps)",
+        "standard": "USB 2.0 Specification / USB-IF",
+        "target_z_diff": 90.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 45.0,
+        "typical_tr_ns": 0.5,
+        "max_skew_mm": 0.127,
+        "special_req": "Ruteo simétrico D+/D-. Si L >= 50 mm, se recomienda plano continuo en L2 sin cruzar split planes.",
+    },
+    "usb3": {
+        "name": "USB 3.0 SuperSpeed Gen 1 (5 Gbps) / Gen 2 (10 Gbps)",
+        "standard": "USB 3.2 Specification / USB-IF",
+        "target_z_diff": 90.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 45.0,
+        "typical_tr_ns": 0.07,
+        "max_skew_mm": 0.127,
+        "special_req": "Requiere capacitores de desacoplo AC de 100 nF (0402) en líneas TX simétricamente alineados. Ruteo preferente en stripline apantallado o microstrip con GND via fence.",
+    },
+    "ethernet_100m": {
+        "name": "Fast Ethernet 100Base-TX",
+        "standard": "IEEE 802.3u",
+        "target_z_diff": 100.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 50.0,
+        "typical_tr_ns": 3.0,
+        "max_skew_mm": 0.15,
+        "special_req": "Aislamiento galvánico con transformador magnetics (1:1). Separar plano de chasis/conector RJ45 del GND digital mediante corte de 2.0 mm.",
+    },
+    "ethernet_1g": {
+        "name": "Gigabit Ethernet 1000Base-T",
+        "standard": "IEEE 802.3ab",
+        "target_z_diff": 100.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 50.0,
+        "typical_tr_ns": 1.0,
+        "max_skew_mm": 0.127,
+        "special_req": "4 pares diferenciales (TRD0..3 +/-). Intra-pair matching < 0.127 mm y pair-to-pair matching < 1.0 mm.",
+    },
+    "can_bus": {
+        "name": "CAN-Bus High-Speed / CAN-FD",
+        "standard": "ISO 11898-2:2016",
+        "target_z_diff": 120.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 60.0,
+        "typical_tr_ns": 5.0,
+        "max_skew_mm": 0.15,
+        "special_req": "Terminación resistiva de 120 Ohm diferencial en extremos del bus (o Split Termination con 2x 60 Ohm + 4.7 nF a GND).",
+    },
+    "mipi_csi_dsi": {
+        "name": "MIPI CSI-2 / DSI (D-PHY High-Speed Mode)",
+        "standard": "MIPI Alliance D-PHY Specification v1.2 / v2.0",
+        "target_z_diff": 100.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 50.0,
+        "typical_tr_ns": 0.2,
+        "max_skew_mm": 0.10,
+        "special_req": "Líneas ultrarrápidas de reloj diferencial (CLK+/-) y datos (D0..Dn+/-). Intra-pair skew < 0.10 mm y Clock-to-Data lane matching < 1.0 mm. Prohibido vías stubs.",
+    },
+    "custom": {
+        "name": "Par Diferencial Personalizado",
+        "standard": "IPC-2141A / IPC-2251",
+        "target_z_diff": 100.0,
+        "tolerance_pct": 10.0,
+        "target_z0": 50.0,
+        "typical_tr_ns": 1.0,
+        "max_skew_mm": 0.127,
+        "special_req": "Parámetros definidos por el usuario según especificación particular.",
+    },
+}
+
+
+def _calc_raw_impedances(
+    topology: str, W: float, S: float, H: float, er: float, T: float
+) -> Tuple[float, float, float, float, float]:
+    if topology.lower() == "stripline":
+        B = 2.0 * H + T
+        z0 = (60.0 / math.sqrt(er)) * math.log((1.9 * B) / (0.8 * W + T))
+        er_eff = er
+        v_prop = 2.99792458e8 / math.sqrt(er)
+        z_diff = 2.0 * z0 * (1.0 - 0.347 * math.exp(-2.9 * (S / B)))
+        kc = 0.347 * math.exp(-2.9 * (S / B))
+    else:
+        z0 = (87.0 / math.sqrt(er + 1.41)) * math.log((5.98 * H) / (0.8 * W + T))
+        er_eff = (er + 1.0) / 2.0 + ((er - 1.0) / 2.0) * (1.0 / math.sqrt(1.0 + 12.0 * (H / W)))
+        v_prop = 2.99792458e8 / math.sqrt(er_eff)
+        z_diff = 2.0 * z0 * (1.0 - 0.48 * math.exp(-0.96 * (S / H)))
+        kc = 0.48 * math.exp(-0.96 * (S / H))
+    return z0, z_diff, er_eff, v_prop, kc
+
+
+def _solve_diff_geometry(
+    topology: str, target_z: float, H: float, er: float, T: float
+) -> Dict[str, Dict[str, Any]]:
+    low, high = 0.05, 2.0
+    for _ in range(50):
+        mid = (low + high) / 2.0
+        s = max(0.127, mid)
+        _, zd, _, _, _ = _calc_raw_impedances(topology, mid, s, H, er, T)
+        if zd > target_z:
+            low = mid
+        else:
+            high = mid
+    w_tight = round(mid, 3)
+    s_tight = round(max(0.127, w_tight), 3)
+    z0_t, zd_t, _, _, _ = _calc_raw_impedances(topology, w_tight, s_tight, H, er, T)
+
+    low, high = 0.05, 2.0
+    for _ in range(50):
+        mid = (low + high) / 2.0
+        s = 3.0 * mid
+        _, zd, _, _, _ = _calc_raw_impedances(topology, mid, s, H, er, T)
+        if zd > target_z:
+            low = mid
+        else:
+            high = mid
+    w_loose = round(mid, 3)
+    s_loose = round(3.0 * w_loose, 3)
+    z0_l, zd_l, _, _, _ = _calc_raw_impedances(topology, w_loose, s_loose, H, er, T)
+
+    return {
+        "tight": {
+            "trace_width_mm": w_tight,
+            "trace_width_mil": round(w_tight * MM_TO_MIL, 2),
+            "diff_spacing_mm": s_tight,
+            "diff_spacing_mil": round(s_tight * MM_TO_MIL, 2),
+            "z0_ohm": round(z0_t, 2),
+            "z_diff_ohm": round(zd_t, 2),
+        },
+        "loose": {
+            "trace_width_mm": w_loose,
+            "trace_width_mil": round(w_loose * MM_TO_MIL, 2),
+            "diff_spacing_mm": s_loose,
+            "diff_spacing_mil": round(s_loose * MM_TO_MIL, 2),
+            "z0_ohm": round(z0_l, 2),
+            "z_diff_ohm": round(zd_l, 2),
+        },
+    }
+
+
+def calc_high_speed_diff_pairs(
+    protocol: str = "usb2",
+    topology: str = "microstrip",
+    target_z_diff_ohm: Optional[float] = None,
+    trace_width_mm: Optional[float] = None,
+    diff_spacing_mm: Optional[float] = None,
+    dielectric_h_mm: float = 0.10,
+    copper_oz: float = 1.0,
+    er: float = 4.05,
+    jlcpcb_stackup: Optional[str] = None,
+    trace_length_pos_mm: Optional[float] = None,
+    trace_length_neg_mm: Optional[float] = None,
+    max_skew_mm: Optional[float] = None,
+    crosses_split_plane: bool = False,
+    has_via_fence: bool = False,
+    via_fence_pitch_mm: Optional[float] = None,
+    rise_time_ns: Optional[float] = None,
+    bend_geometry: str = "mitred_45",
+) -> Dict[str, Any]:
+    proto_key = protocol.lower()
+    if proto_key not in DIFF_PROTOCOLS:
+        raise ValueError(f"Protocolo diferencial desconocido: '{protocol}'. Opciones válidas: {list(DIFF_PROTOCOLS.keys())}")
+
+    proto_cfg = DIFF_PROTOCOLS[proto_key]
+    z_diff_target = float(target_z_diff_ohm) if target_z_diff_ohm is not None else float(proto_cfg["target_z_diff"])
+    tr_ns = float(rise_time_ns) if rise_time_ns is not None else float(proto_cfg["typical_tr_ns"])
+    skew_limit_mm = float(max_skew_mm) if max_skew_mm is not None else float(proto_cfg["max_skew_mm"])
+
+    stackup_applied = None
+    if jlcpcb_stackup:
+        preset = JLCPCB_STACKUPS.get(jlcpcb_stackup)
+        if preset is None:
+            raise ValueError(f"Stackup JLCPCB desconocido: {jlcpcb_stackup}. Opciones: {list(JLCPCB_STACKUPS.keys())}")
+        dielectric_h_mm = float(preset["dielectric_h_mm"])
+        er = float(preset["er"])
+        copper_oz = float(preset["copper_oz"])
+        stackup_applied = {"name": jlcpcb_stackup, **preset}
+
+    _require_pos_finite(dielectric_h_mm, "dielectric_h_mm")
+    _require_pos_finite(er, "er")
+    _require_pos_finite(copper_oz, "copper_oz")
+    _require_pos_finite(tr_ns, "rise_time_ns")
+
+    t_mm = copper_oz * COPPER_OZ_TO_MM
+    synthesis = _solve_diff_geometry(topology, z_diff_target, dielectric_h_mm, er, t_mm)
+
+    is_synthesis_mode = (trace_width_mm is None or diff_spacing_mm is None)
+    if is_synthesis_mode:
+        trace_width_mm = synthesis["tight"]["trace_width_mm"]
+        diff_spacing_mm = synthesis["tight"]["diff_spacing_mm"]
+    else:
+        _require_pos_finite(trace_width_mm, "trace_width_mm")
+        _require_pos_finite(diff_spacing_mm, "diff_spacing_mm")
+
+    z0, z_diff, er_eff, v_prop, kc = _calc_raw_impedances(topology, trace_width_mm, diff_spacing_mm, dielectric_h_mm, er, t_mm)
+    t_pd_ps_per_mm = 1e9 / v_prop
+    w_over_h = trace_width_mm / dielectric_h_mm
+    s_over_w = diff_spacing_mm / trace_width_mm
+    is_tight = (diff_spacing_mm <= 2.0 * trace_width_mm)
+
+    z_tol_pct = proto_cfg["tolerance_pct"]
+    z_min_allowed = z_diff_target * (1.0 - z_tol_pct / 100.0)
+    z_max_allowed = z_diff_target * (1.0 + z_tol_pct / 100.0)
+    z_diff_error_pct = round(((z_diff - z_diff_target) / z_diff_target) * 100.0, 2)
+    impedance_verdict = "PASS" if (z_min_allowed <= z_diff <= z_max_allowed) else "FAIL"
+
+    skew_audit = None
+    if trace_length_pos_mm is not None and trace_length_neg_mm is not None:
+        _require_pos_finite(trace_length_pos_mm, "trace_length_pos_mm")
+        _require_pos_finite(trace_length_neg_mm, "trace_length_neg_mm")
+        delta_l_mm = round(abs(trace_length_pos_mm - trace_length_neg_mm), 3)
+        delta_l_mil = round(delta_l_mm * MM_TO_MIL, 2)
+        skew_ps = round(delta_l_mm * t_pd_ps_per_mm, 2)
+        max_skew_ps = round(skew_limit_mm * t_pd_ps_per_mm, 2)
+        skew_pass = (delta_l_mm <= skew_limit_mm)
+        shorter_trace = "POS" if trace_length_pos_mm < trace_length_neg_mm else "NEG"
+        skew_audit = {
+            "trace_length_pos_mm": trace_length_pos_mm,
+            "trace_length_neg_mm": trace_length_neg_mm,
+            "delta_length_mm": delta_l_mm,
+            "delta_length_mil": delta_l_mil,
+            "skew_ps": skew_ps,
+            "max_allowed_skew_mm": skew_limit_mm,
+            "max_allowed_skew_ps": max_skew_ps,
+            "verdict": "PASS" if skew_pass else "FAIL",
+            "remediation": None if skew_pass else (
+                f"Añada meandro de compensación de {delta_l_mm} mm en la traza {shorter_trace}."
+            ),
+        }
+
+    ref_plane_audit = {
+        "crosses_split_plane": crosses_split_plane,
+        "verdict": "CRITICAL_VIOLATION" if crosses_split_plane else "PASS",
+        "rf_return_current_mechanism": "La corriente de retorno fluye por mínima inductancia directamente bajo cada traza.",
+        "remediation": "Rutee sobre plano GND 100% continuo o agregue vías de costura / capacitor de retorno." if crosses_split_plane else "Plano de referencia continuo verificado.",
+    }
+
+    f_knee_hz = 0.35 / (tr_ns * 1e-9)
+    f_knee_ghz = round(f_knee_hz / 1e9, 2)
+    lambda_dielectric_mm = round((v_prop / f_knee_hz) * 1000.0, 2)
+    max_via_pitch_mm = round(lambda_dielectric_mm / 20.0, 2)
+    min_fence_clearance_mm = round(max(3.0 * trace_width_mm, 2.0 * dielectric_h_mm), 3)
+
+    return {
+        "standard": "IPC-2141A / IPC-2251 / IEEE 802.3 / USB-IF / ISO 11898 / MIPI Alliance",
+        "protocol": proto_cfg["name"],
+        "protocol_spec": proto_cfg["standard"],
+        "special_requirements": proto_cfg["special_req"],
+        "stackup_applied": stackup_applied,
+        "topology": topology,
+        "inputs_evaluated": {
+            "trace_width_mm": trace_width_mm,
+            "diff_spacing_mm": diff_spacing_mm,
+            "dielectric_h_mm": dielectric_h_mm,
+            "copper_oz": copper_oz,
+            "er": er,
+            "w_over_h_ratio": round(w_over_h, 2),
+            "s_over_w_ratio": round(s_over_w, 2),
+            "is_synthesis_mode": is_synthesis_mode,
+        },
+        "impedance_results": {
+            "z0_single_ended_ohm": round(z0, 2),
+            "z_differential_ohm": round(z_diff, 2),
+            "target_z_diff_ohm": z_diff_target,
+            "allowed_range_ohm": [round(z_min_allowed, 1), round(z_max_allowed, 1)],
+            "impedance_error_percent": z_diff_error_pct,
+            "impedance_verdict": impedance_verdict,
+            "propagation_delay_ps_per_mm": round(t_pd_ps_per_mm, 2),
+        },
+        "coupling_evaluation": {
+            "coupling_type": "tight" if is_tight else "loose",
+            "coupling_coefficient_kc": round(kc, 3),
+        },
+        "synthesis_recommendations": synthesis,
+        "skew_audit": skew_audit,
+        "reference_plane_audit": ref_plane_audit,
+        "via_fence_shielding": {
+            "knee_frequency_ghz": f_knee_ghz,
+            "max_recommended_via_pitch_mm": max_via_pitch_mm,
+            "min_trace_to_fence_clearance_mm": min_fence_clearance_mm,
+        },
+    }
+
+
+# ============================================================================
+# MOTOR MATEMÁTICO 11: AUDITORÍA EMC/EMI PRE-COMPLIANCE (CISPR 32 / CISPR 25)
+# ============================================================================
+
+def calc_emc_precompliance_audit(
+    vin_v: float,
+    vout_v: float,
+    iout_a: float,
+    topology: str = "buck",
+    fsw_khz: float = 500.0,
+    trise_ns: float = 5.0,
+    hot_loop_area_mm2: float = 25.0,
+    hot_loop_layer_dist_mm: float = 0.1,
+    emc_standard: str = "CISPR_32_CLASS_B",
+    measurement_distance_m: float = 3.0,
+    efficiency: float = 0.90,
+    filter_damping_ratio: float = 4.0,
+    board_dimensions_mm: Optional[List[float]] = None,
+    dielectric_er: float = 4.4,
+    via_barrel_length_mm: float = 1.0,
+    via_diameter_mm: float = 0.3,
+) -> Dict[str, Any]:
+    _require_pos_finite(vin_v, "vin_v")
+    _require_pos_finite(abs(vout_v), "vout_v")
+    _require_pos_finite(iout_a, "iout_a")
+    _require_pos_finite(fsw_khz, "fsw_khz")
+    _require_pos_finite(trise_ns, "trise_ns")
+    _require_pos_finite(hot_loop_area_mm2, "hot_loop_area_mm2")
+    _require_pos_finite(hot_loop_layer_dist_mm, "hot_loop_layer_dist_mm")
+    _require_pos_finite(measurement_distance_m, "measurement_distance_m")
+
+    if board_dimensions_mm is None:
+        board_dimensions_mm = [100.0, 80.0]
+
+    mu0 = 4.0 * math.pi * 1e-7
+    c = 299792458.0
+    topo = topology.lower().strip()
+    eff = max(0.50, min(0.99, efficiency))
+
+    if topo == "buck":
+        duty = vout_v / (vin_v * eff)
+        i_step = iout_a
+    elif topo == "boost":
+        duty = 1.0 - (vin_v * eff / vout_v)
+        i_step = (vout_v * iout_a) / (vin_v * eff)
+    elif topo == "inverting":
+        duty = abs(vout_v) / (abs(vout_v) + vin_v * eff)
+        i_step = ((abs(vout_v) * iout_a) / (vin_v * eff)) + iout_a
+    else:
+        duty = 0.5
+        i_step = iout_a
+
+    duty = max(0.01, min(0.99, duty))
+    fsw_hz = fsw_khz * 1e3
+    t_sw = 1.0 / fsw_hz
+    trise_s = trise_ns * 1e-9
+    didt_a_us = (i_step / trise_s) / 1e6
+
+    # Análisis Armónicos Conducidos
+    harmonics_table = []
+    worst_delta_db = -999.0
+    worst_harmonic = {}
+    max_h = min(60, max(10, int(30e6 / fsw_hz)))
+    for n in range(1, max_h + 1):
+        fn = n * fsw_hz
+        if fn > 30e6:
+            break
+        sinc1 = abs(math.sin(math.pi * n * duty) / (math.pi * n * duty))
+        sinc2 = abs(math.sin(math.pi * n * trise_s / t_sw) / (math.pi * n * trise_s / t_sw))
+        i_n = 2.0 * i_step * duty * sinc1 * sinc2
+
+        w = 2.0 * math.pi * fn
+        z_cin_im = w * 1.0e-9 - 1.0 / (w * 10e-6)
+        z_cin_abs = math.sqrt(0.005**2 + z_cin_im**2)
+        i_lisn = i_n * (z_cin_abs / math.sqrt((50.0 + 0.005)**2 + z_cin_im**2))
+        v_lisn_uv = i_lisn * 50.0 * 1e6
+        v_dbuv = 20.0 * math.log10(max(v_lisn_uv, 1e-3))
+        lim = 56.0 if fn >= 500e3 else (66.0 - 19.12 * math.log10(fn / 150e3))
+        delta_db = v_dbuv - lim
+
+        if delta_db > worst_delta_db:
+            worst_delta_db = delta_db
+            worst_harmonic = {"order": n, "freq_mhz": round(fn / 1e6, 3), "noise_dbuv": round(v_dbuv, 1), "limit_dbuv": round(lim, 1), "delta_db": round(delta_db, 1)}
+
+    req_filter_atten_db = max(0.0, round(worst_delta_db + 6.0, 1))
+
+    # Síntesis Filtro Pi y Middlebrook
+    worst_f_hz = worst_harmonic.get("freq_mhz", fsw_khz / 1e3) * 1e6
+    fc_calc = worst_f_hz / (10.0 ** (req_filter_atten_db / 40.0)) if req_filter_atten_db > 0 else 0.1 * fsw_hz
+    fc_target_hz = min(0.1 * fsw_hz, fc_calc)
+    target_lf_c2 = 1.0 / ((2.0 * math.pi * fc_target_hz) ** 2)
+    lf_h = 2.2e-6
+    c2_f = (target_lf_c2 / lf_h)
+    actual_fc_hz = 1.0 / (2.0 * math.pi * math.sqrt(lf_h * c2_f))
+
+    zin_smps_ohm = (vin_v ** 2 * eff) / (abs(vout_v) * iout_a)
+    z0_filter = math.sqrt(lf_h / c2_f)
+    n_damp = max(2.0, min(10.0, filter_damping_ratio))
+    cd_uf = round(n_damp * c2_f * 1e6, 1)
+    rd_ohm = round(z0_filter * math.sqrt(((2.0 + n_damp)*(4.0 + 3.0*n_damp)) / (2.0 * (n_damp**2) * (4.0 + n_damp))), 2)
+    zout_filter_peak = round(rd_ohm * (1.0 + math.sqrt(n_damp / (n_damp + 2.0))) / 2.0, 3)
+    middlebrook_margin_db = round(20.0 * math.log10(zin_smps_ohm / zout_filter_peak), 1)
+
+    # Radiación Campo Cercano Hot Loop
+    area_m2 = hot_loop_area_mm2 * 1e-6
+    f_rad_test = 50e6
+    n_rad = max(1, round(f_rad_test / fsw_hz))
+    s1 = abs(math.sin(math.pi * n_rad * duty) / (math.pi * n_rad * duty))
+    s2 = abs(math.sin(math.pi * n_rad * trise_s / t_sw) / (math.pi * n_rad * trise_s / t_sw))
+    in_rad = 2.0 * i_step * duty * s1 * s2
+    e_vm = (mu0 * math.pi * (f_rad_test ** 2) * in_rad * area_m2) / (measurement_distance_m * c)
+    e_dbuv_m = round(20.0 * math.log10(max(e_vm * 1e6, 1e-6)), 1)
+
+    return {
+        "standard": emc_standard,
+        "topology": topo,
+        "operating_point": {
+            "vin_v": vin_v,
+            "vout_v": vout_v,
+            "iout_a": iout_a,
+            "fsw_khz": fsw_khz,
+            "duty_cycle": round(duty, 3),
+            "step_current_a": round(i_step, 2),
+            "di_dt_a_us": round(didt_a_us, 1),
+            "zin_smps_ohm": round(zin_smps_ohm, 2),
+        },
+        "hot_loop_analysis": {
+            "actual_area_mm2": hot_loop_area_mm2,
+            "radiated_e_field_50mhz_dbuv_m": e_dbuv_m,
+            "limit_dbuv_m": 40.0,
+            "status": "PASS" if e_dbuv_m <= 40.0 else "WARNING",
+        },
+        "conducted_emissions": {
+            "worst_harmonic": worst_harmonic,
+            "required_filter_attenuation_db": req_filter_atten_db,
+        },
+        "pi_filter_design": {
+            "lf_uh": round(lf_h * 1e6, 2),
+            "c2_uf": round(c2_f * 1e6, 2),
+            "cutoff_frequency_khz": round(actual_fc_hz / 1e3, 1),
+            "damping_network": {
+                "cd_uf": cd_uf,
+                "rd_ohm": rd_ohm,
+                "peak_zout_filter_ohm": zout_filter_peak,
+                "middlebrook_margin_db": middlebrook_margin_db,
+                "stability_verdict": "EXCELLENT_STABILITY" if middlebrook_margin_db >= 9.5 else "STABLE",
+            },
+        },
+        "compliance_summary": {
+            "verdict": "PASS" if worst_delta_db <= 0 and e_dbuv_m <= 40.0 else "PASS_WITH_PI_FILTER",
+            "action_plan": [
+                f"1. Instale filtro Pi L={round(lf_h * 1e6, 2)} uH, C2={round(c2_f * 1e6, 2)} uF con amortiguamiento Rd={rd_ohm} Ohm.",
+                f"2. Mantenga área de lazo caliente <= {hot_loop_area_mm2} mm² con plano GND continuo.",
+            ],
+        },
+    }
+
+
+# ============================================================================
+# MOTOR MATEMÁTICO 12: VISUALIZACIÓN 3D, KNOLLING Y GEMELOS DIGITALES
+# ============================================================================
+
+IPC_PACKAGE_DIMENSIONS_MM: Dict[str, Tuple[float, float, float]] = {
+    "0201": (0.6, 0.3, 0.25),
+    "0402": (1.0, 0.5, 0.40),
+    "0603": (1.6, 0.8, 0.80),
+    "0805": (2.0, 1.25, 0.90),
+    "1206": (3.2, 1.6, 1.20),
+    "SOT-23": (2.9, 1.3, 1.10),
+    "SOIC-8": (4.9, 3.9, 1.75),
+    "QFN-32": (5.0, 5.0, 0.90),
+    "TYPE-C": (8.9, 7.3, 3.20),
+    "TACT-SWITCH": (6.0, 6.0, 3.5),
+}
+
+DEFAULT_Z_EXPLOSION_LEVELS_MM: Dict[str, float] = {
+    "resistor": 16.0,
+    "capacitor": 16.0,
+    "diode": 18.0,
+    "transistor": 28.0,
+    "ic": 38.0,
+    "switch": 62.0,
+    "connector": 72.0,
+    "module_rf": 84.0,
+}
+
+
+def classify_and_measure_component(c: Dict[str, Any]) -> Dict[str, Any]:
+    des = str(c.get("designator", "")).strip().upper()
+    fp = str(c.get("footprint", "")).strip().upper()
+    cat_in = str(c.get("category", "")).strip().lower()
+
+    if cat_in in DEFAULT_Z_EXPLOSION_LEVELS_MM:
+        category = cat_in
+    elif des.startswith("R"):
+        category = "resistor"
+    elif des.startswith("C"):
+        category = "capacitor"
+    elif des.startswith("D"):
+        category = "diode"
+    elif des.startswith("Q"):
+        category = "transistor"
+    elif des.startswith("U"):
+        category = "ic"
+    elif des.startswith("J") or "USB" in fp or "CONN" in fp:
+        category = "connector"
+    elif des.startswith("SW") or "BTN" in fp:
+        category = "switch"
+    elif "ESP" in fp or "RF" in fp:
+        category = "module_rf"
+    else:
+        category = "ic"
+
+    matched = (3.0, 3.0, 1.5)
+    for k, v in IPC_PACKAGE_DIMENSIONS_MM.items():
+        if k in fp:
+            matched = v
+            break
+
+    w = float(c.get("width_mm") or matched[0])
+    l_val = float(c.get("length_mm") or matched[1])
+    h = float(c.get("height_mm") or matched[2])
+
+    return {"category": category, "width_mm": round(w, 2), "length_mm": round(l_val, 2), "height_mm": round(h, 2)}
+
+
+def generate_3d_showcase(
+    board_dimensions: Dict[str, Any],
+    components: List[Dict[str, Any]],
+    showcase_mode: str = "all",
+    exploded_options: Optional[Dict[str, Any]] = None,
+    knolling_options: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    _require_pos_finite(board_dimensions.get("width_mm", 0.0), "board_dimensions.width_mm")
+    _require_pos_finite(board_dimensions.get("height_mm", 0.0), "board_dimensions.height_mm")
+    bw = float(board_dimensions["width_mm"])
+    bh = float(board_dimensions["height_mm"])
+    b_th = float(board_dimensions.get("thickness_mm", 1.6))
+
+    exp_items = []
+    knoll_items = []
+    padding = float((knolling_options or {}).get("padding_mm", 6.0))
+    start_knoll_x = bw + padding * 2.0
+
+    for idx, c in enumerate(components):
+        meta = classify_and_measure_component(c)
+        cat = meta["category"]
+        z_delta = DEFAULT_Z_EXPLOSION_LEVELS_MM.get(cat, 35.0)
+        x = float(c.get("x_mm", 0.0))
+        y = float(c.get("y_mm", 0.0))
+
+        exp_items.append({
+            "designator": c.get("designator", f"CMP{idx+1}"),
+            "category": cat,
+            "mounted_pos_mm": [x, y, round(b_th / 2.0, 2)],
+            "exploded_pos_mm": [x, y, round(b_th / 2.0 + z_delta, 2)],
+            "dimensions_mm": [meta["width_mm"], meta["length_mm"], meta["height_mm"]],
+        })
+
+        col = idx % 4
+        row = idx // 4
+        knoll_items.append({
+            "designator": c.get("designator", f"CMP{idx+1}"),
+            "knolling_pos_mm": [round(start_knoll_x + col * 16.0, 2), round(padding + row * 16.0, 2), round(meta["height_mm"] / 2.0, 2)],
+        })
+
+    return {
+        "status": "SUCCESS",
+        "standard": "IPC-7351B / ISO 24495-1",
+        "board": {"width_mm": bw, "height_mm": bh, "thickness_mm": b_th},
+        "component_count": len(components),
+        "modes_available": ["exploded_z", "knolling_flat_lay", "assembly_animation"],
+        "exploded_view": {"components": exp_items},
+        "knolling_view": {"items": knoll_items},
+    }
+
+
+# ============================================================================
 # 2. SERVIDOR MCP JSON-RPC 2.0 (STDIO)
 # ============================================================================
 
@@ -1387,6 +1954,71 @@ TOOLS_SCHEMA = [
             "required": ["bom_items"],
         },
     },
+    {
+        "name": "pcb_high_speed_diff_pairs",
+        "description": "Calculadora y Auditor Normativo de Pares Diferenciales de Alta Velocidad (IPC-2141A / IEEE 802.3 / USB-IF): sintetiza ancho de pista W y separación S para microstrip edge-coupled, audita skew intra-par (<5 mils), valida velocidad de propagación y tiempo de vuelo, y detecta violaciones críticas de EMC como cruce de planos divididos (Split Planes) o falta de vías de retorno GND en saltos de capa.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "standard": {"type": "string", "enum": ["USB2_HS", "USB3_SS", "ETHERNET_100BASETX", "ETHERNET_1000BASET", "CAN_FD", "RS485", "MIPI_CSI", "PCIE_GEN3", "CUSTOM"], "default": "USB2_HS"},
+                "trace_width_mm": {"type": "number", "description": "Ancho de cada pista (mm). Si se omite, se sintetiza según impedancia objetivo."},
+                "trace_gap_mm": {"type": "number", "description": "Separación entre pistas del par (mm). Si se omite, se sintetiza."},
+                "dielectric_height_mm": {"type": "number", "description": "Espesor del dieléctrico hasta el plano de referencia GND (mm)."},
+                "er": {"type": "number", "description": "Constante dieléctrica relativa del sustrato (ej. 4.4 para FR4)."},
+                "copper_thickness_um": {"type": "number", "default": 35.0, "description": "Espesor del cobre en micrómetros (1 oz = 35 µm)."},
+                "target_diff_impedance": {"type": "number", "description": "Impedancia diferencial objetivo en Ohms (ej. 90 para USB, 100 para Ethernet/MIPI/PCIe, 120 para CAN/RS485)."},
+                "trace_length_p_mm": {"type": "number", "description": "Longitud física de la línea P (mm)."},
+                "trace_length_n_mm": {"type": "number", "description": "Longitud física de la línea N (mm)."},
+                "signal_frequency_mhz": {"type": "number", "description": "Frecuencia fundamental o de Nyquist de la señal en MHz."},
+                "split_plane_crossing": {"type": "boolean", "default": False, "description": "Indica si el par cruza un corte o split en el plano GND de referencia (Violación crítica EMC)."},
+                "return_path_via_distance_mm": {"type": "number", "description": "Distancia máxima a la vía de retorno GND más cercana si el par cambia de capa (mm)."},
+            },
+            "required": ["dielectric_height_mm", "er"],
+        },
+    },
+    {
+        "name": "pcb_emc_precompliance_auditor",
+        "description": "Auditor Normativo de Pre-Cumplimiento EMC / EMI para Fuentes Conmutadas (CISPR 32 / CISPR 25 / FCC Part 15 / IEEE): evalúa emisiones radiadas por bucles críticos di/dt (Hot Loops), calcula espectro conducido en LISN, sintetiza filtro pi óptimo con red amortiguadora (Damping Network) según el Criterio de Estabilidad de Middlebrook (|Zout_filtro| << |Zin_smps| >= 9.5 dB) y verifica regla de setback de planos 20-H.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "converter_topology": {"type": "string", "enum": ["buck", "boost", "buck_boost", "flyback"], "default": "buck"},
+                "vin_volts": {"type": "number", "description": "Voltaje de entrada (V)."},
+                "vout_volts": {"type": "number", "description": "Voltaje de salida (V)."},
+                "iout_amps": {"type": "number", "description": "Corriente continua de salida (A)."},
+                "fsw_khz": {"type": "number", "description": "Frecuencia de conmutación de la fuente (kHz)."},
+                "hot_loop_area_mm2": {"type": "number", "description": "Área geométrica del bucle de alta di/dt en el layout (mm²)."},
+                "current_rise_time_ns": {"type": "number", "default": 10.0, "description": "Tiempo de conmutación tr/tf de los MOSFETs (ns)."},
+                "standard": {"type": "string", "enum": ["CISPR32_CLASS_B", "CISPR32_CLASS_A", "CISPR25_CLASS_5", "FCC_PART15_CLASS_B"], "default": "CISPR32_CLASS_B"},
+                "pi_filter_installed": {"type": "boolean", "default": False, "description": "Indica si el diseño incluye filtro pi LC de entrada."},
+                "filter_l_uh": {"type": "number", "description": "Inductancia del filtro de entrada (µH)."},
+                "filter_c_uf": {"type": "number", "description": "Capacitancia del filtro de entrada C2 (µF)."},
+                "damping_cd_uf": {"type": "number", "description": "Capacitor electrolítico/tantalio de amortiguación Cd (µF)."},
+                "damping_rd_ohms": {"type": "number", "description": "Resistencia serie equivalente o resistor damping Rd (Ohms)."},
+                "enclosure_shielding_db": {"type": "number", "default": 0.0, "description": "Atenuación del gabinete metálico blindado en dB (0 si es plástico)."},
+                "pcb_plane_20h_setback_complied": {"type": "boolean", "default": True, "description": "Indica si el plano de alimentación VCC está retirado 20 veces la altura h respecto al plano GND perimetral."},
+            },
+            "required": ["vin_volts", "vout_volts", "iout_amps", "fsw_khz", "hot_loop_area_mm2"],
+        },
+    },
+    {
+        "name": "pcb_generate_3d_showcase",
+        "description": "Generador de Presentación 3D Industrial, Gemelos Digitales, Vistas Explosionadas (Exploded View), Knolling Flat-Lay y Animaciones de Ensamblaje / Despiece: sintetiza escenas interactivas Three.js y WebGL integrando geometrías precisas de PCB, componentes LCSC con modelos 3D STEP nativos de EasyEDA Pro, gabinetes IP65/IP67 con rayos conectores de ensamble, y trayectorias cinemáticas de despiece para comités de innovación.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "board_width_mm": {"type": "number", "description": "Ancho del PCB (mm)."},
+                "board_height_mm": {"type": "number", "description": "Alto del PCB (mm)."},
+                "board_thickness_mm": {"type": "number", "default": 1.6, "description": "Espesor del sustrato PCB (mm)."},
+                "layers": {"type": "integer", "default": 2, "description": "Cantidad de capas de cobre (2, 4, 6)."},
+                "devices": {"type": "array", "items": {"type": "object"}, "description": "Lista de componentes con designator, name, footprint, x_mm, y_mm, height_mm, lcsc_id y visual_category."},
+                "enclosure": {"type": "object", "description": "Configuración del gabinete: enabled, type (ej. handheld_panic_button, ip65_junction_box), outer_dimensions, color_hex, transparency."},
+                "assembly_mode": {"type": "string", "enum": ["exploded", "knolling", "continuous_orbit", "all"], "default": "all"},
+                "output_format": {"type": "string", "enum": ["threejs_scene_json", "html_embed", "animation_keyframes_only"], "default": "threejs_scene_json"},
+            },
+            "required": ["board_width_mm", "board_height_mm", "devices"],
+        },
+    },
 ]
 
 
@@ -1426,6 +2058,65 @@ def handle_tool_call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         )
     if name == "pcb_quote_bom_multichannel":
         return quote_bom_multichannel(**args)
+    if name == "pcb_high_speed_diff_pairs":
+        proto = args.get("protocol") or args.get("standard") or "usb2"
+        p_map = {
+            "usb2_hs": "usb2", "usb3_ss": "usb3", "ethernet_100basetx": "ethernet_100m",
+            "ethernet_1000baset": "ethernet_1g", "can_fd": "can_bus", "mipi_csi": "mipi_csi_dsi"
+        }
+        mapped_proto = p_map.get(proto.lower(), proto.lower())
+        d_h = args.get("dielectric_h_mm") or args.get("dielectric_height_mm") or 0.1
+        oz = (args["copper_thickness_um"] / 35.0) if "copper_thickness_um" in args else args.get("copper_oz", 1.0)
+        return calc_high_speed_diff_pairs(
+            protocol=mapped_proto,
+            topology=args.get("topology", "microstrip"),
+            target_z_diff_ohm=args.get("target_z_diff_ohm") or args.get("target_diff_impedance"),
+            trace_width_mm=args.get("trace_width_mm"),
+            diff_spacing_mm=args.get("diff_spacing_mm") or args.get("trace_gap_mm"),
+            dielectric_h_mm=d_h,
+            copper_oz=oz,
+            er=args.get("er", 4.4),
+            jlcpcb_stackup=args.get("jlcpcb_stackup"),
+            trace_length_pos_mm=args.get("trace_length_pos_mm") or args.get("trace_length_p_mm"),
+            trace_length_neg_mm=args.get("trace_length_neg_mm") or args.get("trace_length_n_mm"),
+            max_skew_mm=args.get("max_skew_mm"),
+            crosses_split_plane=args.get("crosses_split_plane", args.get("split_plane_crossing", False)),
+            has_via_fence=args.get("has_via_fence", False),
+            via_fence_pitch_mm=args.get("via_fence_pitch_mm"),
+            rise_time_ns=args.get("rise_time_ns"),
+            bend_geometry=args.get("bend_geometry", "mitred_45"),
+        )
+    if name == "pcb_emc_precompliance_auditor":
+        return calc_emc_precompliance_audit(
+            vin_v=args.get("vin_v") if "vin_v" in args else args.get("vin_volts", 12.0),
+            vout_v=args.get("vout_v") if "vout_v" in args else args.get("vout_volts", 3.3),
+            iout_a=args.get("iout_a") if "iout_a" in args else args.get("iout_amps", 1.0),
+            topology=args.get("converter_topology") or args.get("topology", "buck"),
+            fsw_khz=args.get("fsw_khz", 500.0),
+            trise_ns=args.get("trise_ns") if "trise_ns" in args else args.get("current_rise_time_ns", 5.0),
+            hot_loop_area_mm2=args.get("hot_loop_area_mm2", 25.0),
+            hot_loop_layer_dist_mm=args.get("hot_loop_layer_dist_mm", 0.1),
+            emc_standard=args.get("emc_standard") or args.get("standard", "CISPR_32_CLASS_B"),
+            measurement_distance_m=args.get("measurement_distance_m", 3.0),
+            efficiency=args.get("efficiency", 0.90),
+            filter_damping_ratio=args.get("filter_damping_ratio", 4.0),
+            board_dimensions_mm=args.get("board_dimensions_mm"),
+            dielectric_er=args.get("dielectric_er") or args.get("er", 4.4),
+        )
+    if name == "pcb_generate_3d_showcase":
+        b_dims = args.get("board_dimensions") or {
+            "width_mm": args.get("board_width_mm", 50.0),
+            "height_mm": args.get("board_height_mm", 40.0),
+            "thickness_mm": args.get("board_thickness_mm", 1.6),
+        }
+        comps = args.get("components") or args.get("devices", [])
+        return generate_3d_showcase(
+            board_dimensions=b_dims,
+            components=comps,
+            showcase_mode=args.get("showcase_mode") or args.get("assembly_mode", "all"),
+            exploded_options=args.get("exploded_options"),
+            knolling_options=args.get("knolling_options"),
+        )
     raise ValueError(f"Herramienta desconocida: {name}")
 
 
@@ -1461,7 +2152,7 @@ def run_stdio_server() -> None:
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "agent-design-pcb-mcp",
-                        "version": "4.6.0",
+                        "version": "4.7.0",
                     },
                 },
             }

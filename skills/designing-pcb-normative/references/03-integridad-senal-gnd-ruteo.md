@@ -40,22 +40,49 @@ $$Z_0 = \frac{60}{\sqrt{\epsilon_r}} \ln \left( \frac{1.9 \cdot B}{0.8 \cdot W +
 
 ---
 
-## 3. Pares Diferenciales y Prevención de Diafonía (*Crosstalk*)
+## 3. Ruteo de Pares Diferenciales Críticos de Alta Velocidad y Prevención de Diafonía
 
-### 3.1. Reglas para Pares Diferenciales (USB, Ethernet, HDMI, PCIe, RS-485)
+> **Estándares de Referencia:** IPC-2141A, IPC-2251, IEEE 802.3 (Ethernet), USB-IF (USB 2.0 / USB 3.2), ISO 11898-2 (CAN-FD) y MIPI Alliance D-PHY v1.2/v2.0.
 
-1. **Configure la impedancia diferencial objetivo:** Diseñe para $90\,\Omega$ (USB), $100\,\Omega$ (Ethernet, HDMI, LVDS, RS-485) u $85\,\Omega$ (PCIe Gen 3+), según la especificación de la interfaz.
-2. **Mantenga simetría geométrica:** Trace ambas líneas del par ($D+$ y $D-$) en la misma capa, con ancho y separación constantes en todo su recorrido.
-3. **Iguale las longitudes dentro del par (*Intra-pair Skew*):** La diferencia de longitud entre la línea positiva y negativa no debe superar **$5\,\text{mils}$ ($\approx 0.127\,\text{mm}$)** (equivalente a un desfase temporal $< 5\,\text{ps}$) para evitar conversión de modo diferencial a ruido de modo común.
-4. **Compense el desfase en el origen:** Si un pad o vía introduce asimetría, agregue los meandros de compensación (*trombone tuning*) inmediatamente cerca del punto donde se originó la diferencia de longitud.
+### 3.1. Matriz de Parámetros Normativos por Protocolo
 
-### 3.2. Reglas de Separación contra Diafonía ($3W$ y $5W$)
+| Protocolo | Estándar | $Z_{diff}$ Objetivo | Tolerancia | Flanco $t_r$ | Skew Máx. ($\Delta L$) | Requerimiento Especial de Ruteo |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| **USB 2.0 (High-Speed)** | USB 2.0 Spec | $90\,\Omega$ | $\pm 10\%$ ($81\text{–}99\,\Omega$) | $0.5\,\text{ns}$ | $< 0.127\,\text{mm}$ ($5\,\text{mil}$) | D+/D- simétricos; plano GND continuo en L2 sin cortes. |
+| **USB 3.0 (SuperSpeed)** | USB 3.2 Spec | $90\,\Omega$ | $\pm 10\%$ ($\pm 7\,\Omega$ rec.) | $0.07\,\text{ns}$ | $< 0.127\,\text{mm}$ ($5\,\text{mil}$) | Caps AC de $100\,\text{nF}$ (0402) simétricos en TX; Stripline o Via Fence. |
+| **Fast Ethernet (100M)** | IEEE 802.3u | $100\,\Omega$ | $\pm 10\%$ ($90\text{–}110\,\Omega$)| $3.0\,\text{ns}$ | $< 0.150\,\text{mm}$ ($6\,\text{mil}$) | Transformador Magnetics 1:1; corte de chasis ($2\,\text{mm}$) en RJ45. |
+| **Gigabit Ethernet (1G)**| IEEE 802.3ab | $100\,\Omega$ | $\pm 10\%$ ($90\text{–}110\,\Omega$)| $1.0\,\text{ns}$ | $< 0.127\,\text{mm}$ ($5\,\text{mil}$) | 4 pares (TRD0..3); matching par-a-par $< 1.0\,\text{mm}$. |
+| **CAN-Bus / CAN-FD** | ISO 11898-2 | $120\,\Omega$ | $\pm 10\%$ ($108\text{–}132\,\Omega$)| $5.0\,\text{ns}$ | $< 0.150\,\text{mm}$ ($6\,\text{mil}$) | Split Termination ($2 \times 60\,\Omega + 4.7\,\text{nF}$ a GND) en extremos. |
+| **MIPI CSI-2 / DSI** | MIPI D-PHY | $100\,\Omega$ | $\pm 10\%$ ($90\text{–}110\,\Omega$)| $0.2\,\text{ns}$ | $< 0.100\,\text{mm}$ ($4\,\text{mil}$) | Reloj y Datos HS; Skew Clock-to-Data $< 1.0\,\text{mm}$; sin stubs. |
 
-> [!WARNING]
-> **Acoplamiento inductivo y capacitivo entre pistas vecinas (*Crosstalk*):** Si traza pistas paralelas demasiado juntas, los campos electromagnéticos se solaparán e inducirán pulsos falsos en la pista víctima.
+### 3.2. Topologías de Ruteo: Microstrip vs. Stripline
+- **Edge-Coupled Microstrip (Capas Externas - Top/Bottom):** Adecuado para USB 2.0, Ethernet 100M y CAN-Bus. Sin vías metalizadas requeridas desde conectores SMD.
+- **Edge-Coupled Symmetric Stripline (Capas Internas confinadas):** Obligatorio o recomendado para USB 3.0 SuperSpeed (5-10 Gbps) y MIPI D-PHY. Confinamiento electromagnético total entre planos GND, eliminando la radiación externa.
 
-1. **Aplique la Regla $3W$ en señales digitales generales:** Mantenga una distancia centro a centro entre trazas adyacentes de al menos **tres veces el ancho de la pista ($3 \times W$)** (lo que equivale a un espacio libre borde a borde de $2 \times W$). Esto confina el $\approx 70\%$ del flujo electromagnético y reduce la diafonía a menos del $5\%$.
-2. **Aplique la Regla $5W$ en relojes y señales críticas:** En líneas de reloj (`CLK`), señales analógicas de alta impedancia o pares diferenciales de alta velocidad, aumente la separación centro a centro a **cinco veces el ancho de la pista ($5 \times W$)**.
+### 3.3. Acoplamiento Estrecho (*Tight*) vs. Holgado (*Loose*)
+- **Acoplamiento Estrecho ($S \le 2W$):** Fuerte acoplamiento capacitivo e inductivo mutuo ($k_c > 0.15$). Menor susceptibilidad a ruido externo; sensible a discontinuidades en conectores.
+- **Acoplamiento Holgado ($S > 2W$):** Las trazas se comportan como dos líneas independientes de $Z_0 \approx Z_{diff} / 2$. Ideal con componentes en serie intermedios (capacitores AC, ferritas) e inmune a tolerancias de grabado químico.
+
+### 3.4. Regla Cardinal de Retorno: Prohibición de Cruce de Planos Divididos (*Split Planes*)
+> [!CAUTION]
+> **Pérdida Catastrófica de Integridad de Señal y Emisión EMI:** La corriente de retorno fluye por el plano de tierra directamente bajo la traza diferencial ($I \propto 1 / (1 + (x/H)^2)$). Si el par cruza un corte de plano (*split plane*), la inductancia de bucle se multiplica ($5\text{–}15\,\text{nH}$), se genera un salto de impedancia diferencial de más de $150\,\Omega$ y el corte actúa como antena de ranura irradiando armónicos destructivos.
+> **Regla Mandataria:** Rutee siempre sobre plano GND 100% continuo. Si el par debe cambiar de capa, coloque dos vías de costura GND (*ground stitching vias*) a menos de $0.8\,\text{mm}$ de las vías diferenciales.
+
+### 3.5. Geometría de Curvas, Mitrado y Compensación de Skew
+1. **Prohibición de Esquinas a 90°:** Causan exceso capacitivo ($C_{corner} \approx 0.03\,\text{pF}$) y degradan flancos ultra-rápidos.
+2. **Geometrías Válidas:** Arcos circulares suaves con radio $R \ge 3 \times W$ o chaflanes a 45° con biselado estándar del 50–60%.
+3. **Compensación de Skew por Curva:** En cada curva, la traza exterior recorre mayor longitud ($\Delta L_{90^\circ} = 1.57 \cdot (W + S)$). Incorpore un meandro tipo trombón en la traza interior inmediatamente al salir de la curva (amplitud $\le 3W$, paso $\ge 3W$).
+
+### 3.6. Apantallamiento Lateral con Vías (*GND Via Fence*)
+Para proteger pares de alta velocidad contra interferencias de fuentes conmutadas (DC-DC) o transmisores RF:
+1. Frecuencia de rodilla: $f_{knee} = 0.35 / t_r$.
+2. Longitud de onda en el dieléctrico: $\lambda = v_{prop} / f_{knee}$.
+3. Paso máximo entre vías de costura: $p_{via} \le \lambda / 20$.
+4. Distancia de aislamiento lateral: $d_{fence} \ge \max(3 \times W, 2 \times H)$ para no alterar la impedancia diferencial.
+
+### 3.7. Reglas de Separación contra Diafonía ($3W$ y $5W$)
+1. **Regla $3W$ en señales digitales generales:** Distancia centro a centro $\ge 3 \times W$ (espacio libre borde a borde $\ge 2 \times W$), reduciendo la diafonía a menos del 5%.
+2. **Regla $5W$ en relojes y señales críticas:** En líneas de reloj (`CLK`), señales analógicas de alta impedancia o pares diferenciales, aumente la separación a cinco veces el ancho ($5 \times W$).
 
 ---
 

@@ -1,12 +1,12 @@
-# AGENT-DESIGN-PCB (v4.6) — Ingeniero Electrónico Acoplado a EasyEDA Pro, Servidor MCP Normativo y Cotizador Multicanal
+# AGENT-DESIGN-PCB (v4.7) — Ingeniero Electrónico Acoplado a EasyEDA Pro, Servidor MCP Normativo, Cotizador Multicanal y Gemelos Digitales 3D
 
 > **Una iniciativa de S&D MMCALL para la comunidad.**  
-> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, acoplado nativamente a **EasyEDA Pro (Device-First + LCSC/JLCPCB + Stackups Oficiales + SPICE + Transacciones seguras)**, basándose en física real, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), política de **Cero Invención (*Datasheet-First*)**, un **servidor MCP nativo con 9 motores deterministas** (con Matriz de Seguridad de Pines de 3 Niveles y Arquitectura ULP Wi-Fi+SIM) y **Asistente Cotizador Multicanal (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**.
+> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, acoplado nativamente a **EasyEDA Pro (Device-First + LCSC/JLCPCB + Stackups Oficiales + SPICE + Transacciones seguras)**, basándose en física real, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**, **CISPR**, **IEEE**), política de **Cero Invención (*Datasheet-First*)**, un **servidor MCP nativo con 12 motores deterministas** (con Matriz de Seguridad de Pines de 3 Niveles, Pares Diferenciales de Alta Velocidad, Filtro Pi con Estabilidad Middlebrook y Generador 3D Industrial con Knolling y Cinemática de Despiece) y **Asistente Cotizador Multicanal (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**.
 
-[![Versión: 4.6](https://img.shields.io/badge/Versión-4.6%20EasyEDA%20Pro%20%2B%203--Tier%20Pin%20Matrix%20%2B%20ULP-brightgreen.svg)](#1-qué-hace-este-proyecto)
+[![Versión: 4.7](https://img.shields.io/badge/Versión-4.7%20EasyEDA%20Pro%20%2B%2012%20Motores%20MCP%20%2B%203D%20Knolling%20%2B%20EMC-brightgreen.svg)](#1-qué-hace-este-proyecto)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-blue.svg)](LICENSE)
 [![Norma de Redacción: ISO 24495-1](https://img.shields.io/badge/Documentación-ISO%2024495--1%20%7C%20ISO%2FIEC%2082079--1-success.svg)](#3-estructura-del-repositorio)
-[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.6)-blueviolet.svg)](mcp-server/)
+[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.7)-blueviolet.svg)](mcp-server/)
 [![Conector CAD: easyeda-mcp-pro](https://img.shields.io/badge/CAD%20Bridge-easyeda--mcp--pro-orange.svg)](https://github.com/oaslananka/easyeda-mcp-pro)
 
 ---
@@ -69,11 +69,11 @@ AGENT-DESIGN-PCB/
 │   ├── easyeda-bridge-extension.eext                   # Paquete oficial .eext para importar en EasyEDA Pro
 │   └── easyeda-bridge-extension.checksums.json         # Checksums SHA-256 de verificación
 ├── mcp-server/                                         # Servidor MCP Normativo Desarrollado por S&D MMCALL
-│   ├── agent_design_pcb_mcp.py                         # Servidor stdio JSON-RPC 2.0 con 9 herramientas IPC/IEC/Sourcing
+│   ├── agent_design_pcb_mcp.py                         # Servidor stdio JSON-RPC 2.0 con 12 herramientas IPC/IEC/Sourcing/EMC/3D
 │   └── test_mcp_and_easyeda_live.py                    # Suite de pruebas automatizadas y diagnóstico de placa
 └── skills/
     └── designing-pcb-normative/                        # Skill para el agente de IA
-        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.4)
+        ├── SKILL.md                                    # Instrucciones maestras de la skill (v4.7)
         ├── templates/                                  # Plantillas Markdown y HTML interactivas
         │   ├── HARDWARE-SPEC.template.md               # Memoria viva del hardware
         │   ├── BOM-SOURCING.template.md                # Matriz de compras (LCSC / AliExpress / Alibaba / Local)
@@ -82,7 +82,7 @@ AGENT-DESIGN-PCB/
         │   ├── VIRTUAL-BREADBOARD.template.html        # Protoboard Virtual preliminar (HTML5)
         │   ├── PCB-CONNECTION-WORKBENCH.template.html  # PCB de Conexión Interactivo con Pinouts & EasyEDA JSON
         │   └── BOM-QUOTER-WORKBENCH.template.html      # Cotizador Interactivo 4 Canales (LCSC/Ali/Alibaba/Local)
-        └── references/                                 # 15 Manuales técnicos normativos (00 a 14)
+        └── references/                                 # 17 Manuales técnicos normativos (00 a 16)
             ├── 00-entrevista-y-contexto-proyecto.md
             ├── 01-esquematico-pdn-esd.md
             ├── 02-termica-aislamiento-materiales.md
@@ -97,7 +97,9 @@ AGENT-DESIGN-PCB/
             ├── 11-guia-operativa-editor-easyeda.md
             ├── 12-servidor-mcp-normativo-agente.md
             ├── 13-del-protoboard-fisico-y-virtual-al-pcb.md
-            └── 14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md
+            ├── 14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md
+            ├── 15-visualizacion-3d-industrial-knolling-gemelos-digitales.md
+            └── 16-auditoria-emc-emi-precompliance-y-filtros-industriales.md
 ```
 
 ---
