@@ -187,6 +187,27 @@ def test_normative_calculators() -> None:
         pass
     print("  [OK] XIAO-ESP32-C5 Validator + Endurecimiento CWE-20/369 verificados.")
 
+    # 1.11 Validación Matriz de 3 Niveles (v4.6): Bloqueo Flash, Octal PSRAM, Input-Only y Walter módem
+    c5_flash_bad = mcp.validate_mcu_pinout("ESP32-C5", {"GPIO16": "RELAY_OUT"})
+    assert c5_flash_bad["passed"] is False
+    assert any("SPI Flash/PSRAM" in err for err in c5_flash_bad["blocking_errors"])
+
+    s3_octal_bad = mcp.validate_mcu_pinout("ESP32-S3", {"GPIO35": "SPI_CLK"}, octal_flash_psram=True)
+    assert s3_octal_bad["passed"] is False
+    assert any("GPIO35" in err for err in s3_octal_bad["blocking_errors"])
+
+    esp32_in_bad = mcp.validate_mcu_pinout("ESP32", {"GPIO34": "LED_OUT"})
+    assert esp32_in_bad["passed"] is False
+    assert any("SOLO ENTRADA" in err for err in esp32_in_bad["blocking_errors"])
+
+    walter_bad = mcp.validate_mcu_pinout("WALTER-ESP32-S3", {"GPIO45": "USER_UART_TX"})
+    assert walter_bad["passed"] is False
+    assert any("módem interno" in err for err in walter_bad["blocking_errors"])
+
+    ulp_backpower = mcp.validate_mcu_pinout("XIAO-ESP32-C5", {"D6": "MODEM_TX", "D7": "MODEM_RX", "D8": "LTE_EN"})
+    assert any("Anti Back-Powering" in rec for rec in ulp_backpower["mandatory_hardware_checks"])
+    print("  [OK] Matriz de Seguridad de Pines de 3 Niveles (v4.6) validada (Flash, Octal, Input-Only, Walter y Back-Powering).")
+
 
 def test_stdio_jsonrpc_protocol() -> None:
     print("\n=== 2. Probando Protocolo MCP JSON-RPC 2.0 sobre STDIO ===")

@@ -1,12 +1,12 @@
-# AGENT-DESIGN-PCB (v4.4) — Ingeniero Electrónico Acoplado a EasyEDA Pro, Servidor MCP Normativo y Cotizador Multicanal
+# AGENT-DESIGN-PCB (v4.6) — Ingeniero Electrónico Acoplado a EasyEDA Pro, Servidor MCP Normativo y Cotizador Multicanal
 
 > **Una iniciativa de S&D MMCALL para la comunidad.**  
-> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, acoplado nativamente a **EasyEDA Pro (Device-First + LCSC/JLCPCB + Stackups Oficiales + SPICE + Transacciones seguras)**, basándose en física real, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), política de **Cero Invención (*Datasheet-First*)**, un **servidor MCP nativo con 9 motores deterministas** y **Asistente Cotizador Multicanal (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**.
+> Creado con el afán de ayudar a ingenieros, estudiantes, *makers* y desarrolladores a formular, proteger, diseñar, cotizar, armar y poner en marcha placas electrónicas (PCB) de forma correcta, acoplado nativamente a **EasyEDA Pro (Device-First + LCSC/JLCPCB + Stackups Oficiales + SPICE + Transacciones seguras)**, basándose en física real, normas internacionales (**IPC**, **IEC**, **J-STD**, **ANSI/ESD**), política de **Cero Invención (*Datasheet-First*)**, un **servidor MCP nativo con 9 motores deterministas** (con Matriz de Seguridad de Pines de 3 Niveles y Arquitectura ULP Wi-Fi+SIM) y **Asistente Cotizador Multicanal (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**.
 
-[![Versión: 4.4](https://img.shields.io/badge/Versión-4.4%20EasyEDA%20Pro%20%2B%204--Channel%20Quoter-brightgreen.svg)](#1-qué-hace-este-proyecto)
+[![Versión: 4.6](https://img.shields.io/badge/Versión-4.6%20EasyEDA%20Pro%20%2B%203--Tier%20Pin%20Matrix%20%2B%20ULP-brightgreen.svg)](#1-qué-hace-este-proyecto)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-blue.svg)](LICENSE)
 [![Norma de Redacción: ISO 24495-1](https://img.shields.io/badge/Documentación-ISO%2024495--1%20%7C%20ISO%2FIEC%2082079--1-success.svg)](#3-estructura-del-repositorio)
-[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.4)-blueviolet.svg)](mcp-server/)
+[![Servidor MCP: agent-design-pcb-mcp](https://img.shields.io/badge/MCP-agent--design--pcb--mcp%20(v4.6)-blueviolet.svg)](mcp-server/)
 [![Conector CAD: easyeda-mcp-pro](https://img.shields.io/badge/CAD%20Bridge-easyeda--mcp--pro-orange.svg)](https://github.com/oaslananka/easyeda-mcp-pro)
 
 ---

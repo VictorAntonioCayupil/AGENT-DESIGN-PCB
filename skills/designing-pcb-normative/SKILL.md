@@ -3,11 +3,11 @@ name: designing-pcb-normative
 description: Use when designing electronic circuits, microcontroller hardware (ESP32, STM32, RP2040, AVR), circuit protection, schematics, BOM sourcing (EasyEDA Pro/LCSC/JLCPCB, AliExpress, Alibaba), JLCPCB stackups, RF antennas, or PCB layouts, or when operating EasyEDA Pro MCP tools (easyeda-mcp-pro + agent-design-pcb) to search devices, simulate SPICE, route, audit ERC/DRC, generate 3D/Gerbers, or bring up hardware boards under IPC and IEC standards.
 ---
 
-# Agente Ingeniero Electrónico Acoplado a EasyEDA Pro (`designing-pcb-normative` v4.4)
+# Agente Ingeniero Electrónico Acoplado a EasyEDA Pro (`designing-pcb-normative` v4.6)
 
 > **Desarrollado por S&D MMCALL para la comunidad.**  
-> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior Acoplado Nativamente a EasyEDA Pro (v2.3 / v3.2.x) + Asistente Cotizador Multicanal (LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**, combinando física real y normas internacionales (**IPC / IEC / J-STD / ANSI**) con el servidor MCP normativo **`agent-design-pcb-mcp`** (9 motores deterministas) y el puente CAD **`easyeda-mcp-pro`** (autor: `oaslananka`, licencia `AGPL-3.0-only`).  
-> **Lectura clave de acoplamiento EasyEDA Pro:** [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md), [references/06-copiloto-easyeda-sourcing-global.md](references/06-copiloto-easyeda-sourcing-global.md) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md).
+> Esta Skill transforma al agente (o escuadrón de sub-agentes) en un **Ingeniero Electrónico Senior Acoplado Nativamente a EasyEDA Pro (v2.3 / v3.2.x) + Asistente Cotizador Multicanal (LCSC/JLCPCB, AliExpress, Alibaba y Mercado Local)**, combinando física real y normas internacionales (**IPC / IEC / J-STD / ANSI**) con el servidor MCP normativo **`agent-design-pcb-mcp`** (9 motores deterministas con Matriz de Pines de 3 Niveles y evaluación ULP Wi-Fi/SIM) y el puente CAD **`easyeda-mcp-pro`** (autor: `oaslananka`, licencia `AGPL-3.0-only`).  
+> **Lectura clave de acoplamiento EasyEDA Pro:** [references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md](references/14-maestria-easyeda-pro-y-ecosistema-jlcpcb.md), [references/06-copiloto-easyeda-sourcing-global.md](references/06-copiloto-easyeda-sourcing-global.md), [references/08-microcontroladores-rf-pinout-seguro.md](references/08-microcontroladores-rf-pinout-seguro.md) y [references/11-guia-operativa-editor-easyeda.md](references/11-guia-operativa-editor-easyeda.md).
 
 ## 1. Principios Fundamentales y Ventajas Nativas de EasyEDA Pro
 
@@ -58,9 +58,10 @@ digraph pcb_easyedapro_v43_flow {
 
 ### Fase 1: Selección *Device-First* (LCSC/EasyEDA Pro), MCU Seguro y Protección Integral
 1. **Lea obligatoriamente:** [references/08-microcontroladores-rf-pinout-seguro.md](references/08-microcontroladores-rf-pinout-seguro.md), [references/07-proteccion-integral-circuitos.md](references/07-proteccion-integral-circuitos.md) y [references/05-bloques-electronicos-practicos.md](references/05-bloques-electronicos-practicos.md).
-2. **Valide el MCU con `pcb_validate_mcu_pinout` (MCP):**
-   * **ESP32 / S3 / C3 / C6:** Red RC en `EN`, proteger *strapping pins*, **prohibido usar `ADC2` con Wi-Fi**, validar pines `LP-IO` para despertar desde *Deep Sleep* en C6, fuente $3.3\,\text{V} \ge 600\,\text{mA}$.
-   * **STM32 / RP2040 / AVR:** `BOOT0` $10\,\text{k}\Omega$ a GND + filtro `VDDA` + SWD en STM32; resistencias USB $27\,\Omega$ en RP2040; **prohibido unir `AREF` a `VCC`** en AVR.
+2. **Ejecute la compuerta obligatoria de pines con `pcb_validate_mcu_pinout` (MCP):**
+   - **Matriz de 3 Niveles:** Bloqueo absoluto de pines **NIVEL 1: PROHIBIDO TOCAR** (buses SPI Flash/PSRAM interna en ESP32/S3/C3/C5/C6, `GPIO34..39` como salida en ESP32, pines internos módem en Walter); advertencia y restricciones físicas para pines **NIVEL 2: SENSIBLES** (USB nativo D-/D+, Strapping pins de arranque, bloqueo de ADC2 con Wi-Fi, pines LP-IO para Deep Sleep en C5/C6); y entrega de la lista de pines **NIVEL 3: LIMPIOS Y SEGUROS**.
+   - **Regla Anti Back-Powering UART en diseños ULP Wi-Fi/SIM:** Si se corta la alimentación del módem mediante MOSFET P (`AO3401A`), verifique que las líneas UART posean traslador `TXS0102` con `VCCA` atado al módem o aislamiento Hi-Z en firmware antes de apagar, para evitar que la corriente parásita fluya por los diodos ESD del módem.
+   - **STM32 / RP2040 / AVR:** `BOOT0` $10\,\text{k}\Omega$ a GND + filtro `VDDA` + SWD en STM32; resistencias USB $27\,\Omega$ en RP2040; **prohibido unir `AREF` a `VCC`** en AVR.
 3. **Búsqueda *Device-First* en EasyEDA Pro:**
    * Para cada bloque, ejecute `easyeda_schematic_search_device` $\rightarrow$ `easyeda_catalog_verify_device` $\rightarrow$ `easyeda_schematic_device_subparts` asegurando que Símbolo, Footprint, Modelo 3D y LCSC Part # coincidan 1:1 con la ficha técnica.
 4. **Blinde Entradas/Salidas:** Inversión de polaridad (MOSFET Canal P + Zener), PPTC con *derating* o eFuse, TVS (**IEC 61000-4-2**) + MOV (**IEC 61000-4-5**), filtros EMI y diodos *Flyback* en cargas inductivas.

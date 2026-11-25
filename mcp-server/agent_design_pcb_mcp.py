@@ -403,60 +403,164 @@ def validate_mcu_pinout(
     mcu_family: str,
     pin_assignments: Dict[str, str],
     uses_wifi: bool = True,
+    octal_flash_psram: bool = False,
 ) -> Dict[str, Any]:
     """
-    Valida asignaciones de pines contra trampas de hardware-firmware (Strapping pins,
-    conflicto ADC2+Wi-Fi, pines de reset/boot, AREF, etc.) según el Manual 08.
+    Valida asignaciones de pines contra la Matriz de 3 Niveles (Manual 08):
+    1. PROHIBIDO TOCAR (SPI Flash/PSRAM interna, Input-Only usados como salida, pines internos módem Walter).
+    2. PINES SENSIBLES (USB D+/D- nativo, JTAG dedicado, Strapping pins de arranque, ADC2+Wi-Fi, Back-powering UART).
+    3. PINES LIMPIOS RECOMENDADOS (safe_clean_pins).
     """
     fam = mcu_family.upper()
     warnings: List[str] = []
     blocking_errors: List[str] = []
     recommendations: List[str] = []
+    safe_clean_pins: List[str] = []
 
-    if "ESP32" in fam:
-        # Reglas comunes ESP32 / S3 / C3 / C6
+    if "ESP32" in fam or "WALTER" in fam:
+        # 1. PINES PROHIBIDOS ("NO TOCAR": SPI Flash / PSRAM / Internos Módem)
+        flash_forbidden: Dict[str, set] = {
+            "ESP32-CLASSIC": {"GPIO6", "GPIO7", "GPIO8", "GPIO9", "GPIO10", "GPIO11"},
+            "S3": {"GPIO26", "GPIO27", "GPIO28", "GPIO29", "GPIO30", "GPIO31", "GPIO32"} | (
+                {"GPIO33", "GPIO34", "GPIO35", "GPIO36", "GPIO37"} if octal_flash_psram else set()
+            ),
+            "C3": {"GPIO12", "GPIO13", "GPIO14", "GPIO15", "GPIO16", "GPIO17"},
+            "C6": {"GPIO24", "GPIO25", "GPIO26", "GPIO27", "GPIO28", "GPIO29", "GPIO30"},
+            "C5": {"GPIO15", "GPIO16", "GPIO17", "GPIO18", "GPIO20", "GPIO21", "GPIO22"},
+        }
+        variant = (
+            "C5" if "C5" in fam else
+            "C6" if "C6" in fam else
+            "C3" if "C3" in fam else
+            "S3" if ("S3" in fam or "WALTER" in fam) else
+            "ESP32-CLASSIC"
+        )
+        forbidden_set = set(flash_forbidden[variant])
+        if "WROVER" in fam and variant == "ESP32-CLASSIC":
+            forbidden_set |= {"GPIO16", "GPIO17"}
+        if "WALTER" in fam:
+            # En DPTechnics Walter el módem Sequans GM02SP usa internamente pines dedicados
+            forbidden_set |= {"GPIO14", "GPIO45"}
+
+        # Pines USB Nativo D- / D+ (sensibles: inhabilitan consola/flasheo USB CDC/JTAG)
+        usb_native: Dict[str, set] = {
+            "ESP32-CLASSIC": set(),
+            "S3": {"GPIO19", "GPIO20"},
+            "C3": {"GPIO18", "GPIO19"},
+            "C6": {"GPIO12", "GPIO13"},
+            "C5": {"GPIO13", "GPIO14"},
+        }
+
+        # Strapping pins específicos por sub-familia
+        strapping_by_var: Dict[str, Dict[str, str]] = {
+            "ESP32-CLASSIC": {
+                "GPIO0": "Boot mode (debe estar HIGH para arrancar Flash).",
+                "GPIO2": "Debe estar LOW/flotante al flashear.",
+                "GPIO5": "Timing SDIO Slave.",
+                "GPIO12": "CRÍTICO MTDI: si está HIGH al encender fuerza VDD_SDIO=1.8V y bloquea la Flash de 3.3V.",
+                "GPIO15": "MTDO: silencia log UART0 si está LOW.",
+            },
+            "S3": {
+                "GPIO0": "Boot mode.",
+                "GPIO3": "Fuente JTAG.",
+                "GPIO45": "Tensión VDD_SPI (no forzar HIGH si usa Flash/PSRAM 3.3V).",
+                "GPIO46": "Boot mode (debe estar LOW/flotante al arrancar).",
+            },
+            "C3": {
+                "GPIO2": "Strapping / Glitch check.",
+                "GPIO8": "CRÍTICO: debe estar HIGH (pull-up 10k) para habilitar descarga serie/USB.",
+                "GPIO9": "BOOT (pull-up interno).",
+            },
+            "C6": {
+                "GPIO4": "MTMS Strapping.",
+                "GPIO5": "MTDI Strapping.",
+                "GPIO8": "Debe estar HIGH para control de modo boot.",
+                "GPIO9": "BOOT (pull-up interno).",
+                "GPIO15": "Control ROM log / JTAG.",
+            },
+            "C5": {
+                "GPIO2": "MTMS Strapping.",
+                "GPIO3": "MTDI Strapping.",
+                "GPIO7": "Strapping (D3 en XIAO C5).",
+                "GPIO25": "Strapping SDIO (D2 en XIAO C5, sin ADC).",
+                "GPIO26": "Strapping.",
+                "GPIO27": "Strapping.",
+                "GPIO28": "Strapping.",
+                "D2": "En XIAO C5 corresponde a GPIO25 (Strapping, sin ADC).",
+                "D3": "En XIAO C5 corresponde a GPIO7 (Strapping).",
+            },
+        }
+
+        safe_by_var: Dict[str, List[str]] = {
+            "ESP32-CLASSIC": ["GPIO4", "GPIO13", "GPIO14", "GPIO18", "GPIO19", "GPIO21", "GPIO22", "GPIO23", "GPIO25", "GPIO26", "GPIO27", "GPIO32", "GPIO33"],
+            "S3": ["GPIO1", "GPIO2", "GPIO4", "GPIO5", "GPIO6", "GPIO7", "GPIO8", "GPIO9", "GPIO10", "GPIO11", "GPIO12", "GPIO13", "GPIO17", "GPIO18", "GPIO21", "GPIO38", "GPIO39", "GPIO40", "GPIO41", "GPIO42"],
+            "C3": ["GPIO0", "GPIO1", "GPIO3", "GPIO4", "GPIO5", "GPIO6", "GPIO7", "GPIO10"],
+            "C6": ["GPIO0", "GPIO1", "GPIO2", "GPIO3", "GPIO6", "GPIO7", "GPIO10", "GPIO11", "GPIO16", "GPIO17", "GPIO18", "GPIO19", "GPIO20", "GPIO21", "GPIO22", "GPIO23"],
+            "C5": ["D0 (GPIO1/ADC1/LP)", "D1 (GPIO0/LP)", "D4 (GPIO23 SDA)", "D5 (GPIO24 SCL)", "D6 (GPIO11 TX)", "D7 (GPIO12 RX)", "D8 (GPIO8)", "D9 (GPIO9)", "D10 (GPIO10)"],
+        }
+        safe_clean_pins = safe_by_var[variant]
+
+        # Validaciones generales por pin
+        input_only_classic = {"GPIO34", "GPIO35", "GPIO36", "GPIO39"}
+        output_keywords = ("OUT", "DRV", "EN", "TX", "SCL", "SDA", "MOSI", "SCK", "LED", "PWM", "RELAY")
+
+        for p, func in pin_assignments.items():
+            pu = p.upper().strip()
+            fu = func.upper().strip()
+
+            if pu in forbidden_set:
+                blocking_errors.append(
+                    f"PROHIBIDO TOCAR {pu} ('{func}'): Pin reservado internamente para SPI Flash/PSRAM o módem interno en {mcu_family}. Conectarlo cuelga el SoC."
+                )
+
+            if variant == "ESP32-CLASSIC" and pu in input_only_classic:
+                if any(kw in fu for kw in output_keywords):
+                    blocking_errors.append(
+                        f"PROHIBIDO {pu} ('{func}'): En ESP32 clásico GPIO34..39 son SOLO ENTRADA (sin etapa push-pull ni pull-up/down interno)."
+                    )
+                else:
+                    warnings.append(
+                        f"Pin Sensible {pu} ('{func}'): GPIO34..39 carecen de pull-up/pull-down interno; exigen resistor externo físico."
+                    )
+
+            if pu in usb_native[variant] and "USB" not in fu:
+                warnings.append(
+                    f"Pin Sensible USB Nativo {pu} asignado a '{func}': deshabilitará el puerto USB Serial/JTAG directo de programación y depuración."
+                )
+
+            if pu in strapping_by_var[variant]:
+                warnings.append(
+                    f"Strapping Pin Sensible {pu} asignado a '{func}': {strapping_by_var[variant][pu]}"
+                )
+
+        # ADC2 + Wi-Fi bloqueo por hardware
         if uses_wifi:
             adc2_pins = {
-                "ESP32": {"GPIO0", "GPIO2", "GPIO4", "GPIO12", "GPIO13", "GPIO14", "GPIO15", "GPIO25", "GPIO26", "GPIO27"},
-                "ESP32-S3": {"GPIO11", "GPIO12", "GPIO13", "GPIO14", "GPIO15", "GPIO16", "GPIO17", "GPIO18", "GPIO19", "GPIO20"},
-                "ESP32-C3": {"GPIO5"},
+                "ESP32-CLASSIC": {"GPIO0", "GPIO2", "GPIO4", "GPIO12", "GPIO13", "GPIO14", "GPIO15", "GPIO25", "GPIO26", "GPIO27"},
+                "S3": {"GPIO11", "GPIO12", "GPIO13", "GPIO14", "GPIO15", "GPIO16", "GPIO17", "GPIO18", "GPIO19", "GPIO20"},
+                "C3": {"GPIO5"},
             }
-            for k, pins in adc2_pins.items():
-                if k in fam or (k == "ESP32" and fam == "ESP32"):
-                    for p, func in pin_assignments.items():
-                        if p.upper() in pins and "ADC" in func.upper():
-                            blocking_errors.append(
-                                f"{p} ({func}): Pertenece a ADC2, el cual queda bloqueado por hardware cuando el Wi-Fi está activo. Mueva la lectura analógica a ADC1."
-                            )
+            if variant in adc2_pins:
+                for p, func in pin_assignments.items():
+                    if p.upper().strip() in adc2_pins[variant] and "ADC" in func.upper():
+                        blocking_errors.append(
+                            f"{p} ({func}): Pertenece a ADC2, bloqueado por hardware cuando Wi-Fi está activo. Use exclusivamente ADC1."
+                        )
 
-        strapping = {
-            "GPIO0": "Pin de Boot. No conecte cargas ni sensores que lo fuercen a GND al encender.",
-            "GPIO12": "En ESP32 clásico define tensión VDD_SDIO (si está en ALTO al arrancar fuerza 1.8V y bloquea la Flash).",
-            "GPIO45": "En ESP32-S3 define tensión VDD_SPI al arrancar.",
-            "GPIO46": "En ESP32-S3 es pin de strapping (debe estar en BAJO o flotante al arrancar).",
-            "GPIO8": "En ESP32-C3/C6 debe estar en ALTO (pull-up 10k) para permitir modo descarga.",
-            "GPIO9": "En ESP32-C3/C6 es el pin de BOOT (pull-up interno; a GND entra en modo bootloader).",
-        }
-        for p, func in pin_assignments.items():
-            pu = p.upper()
-            if pu in strapping:
-                warnings.append(f"Strapping Pin {pu} asignado a '{func}': {strapping[pu]}")
-
-        if "C6" in fam:
+        if variant == "C6":
             lp_io = {"GPIO0", "GPIO1", "GPIO2", "GPIO3", "GPIO4", "GPIO5", "GPIO6", "GPIO7", "D0", "D1", "D2"}
             for p, func in pin_assignments.items():
-                if ("WAKE" in func.upper() or "SLEEP" in func.upper()) and p.upper() not in lp_io:
+                if ("WAKE" in func.upper() or "SLEEP" in func.upper()) and p.upper().strip() not in lp_io:
                     blocking_errors.append(
                         f"{p} ({func}): En ESP32-C6 solo GPIO0..GPIO7 son LP-IO capaces de despertar al chip desde Deep Sleep (ext1)."
                     )
 
-        if "C5" in fam:
+        if variant == "C5":
             c5_adc_pins = {"GPIO1", "GPIO2", "GPIO3", "GPIO4", "GPIO5", "GPIO6", "D0"}
-            c5_strapping = {"GPIO2", "GPIO3", "GPIO7", "GPIO25", "GPIO26", "GPIO27", "GPIO28", "D2", "D3", "MTMS", "MTDI"}
             jtag_pads = {"MTMS", "MTDI", "MTCK", "MTDO"}
             for p, func in pin_assignments.items():
-                pu = p.upper()
-                fu = func.upper()
+                pu = p.upper().strip()
+                fu = func.upper().strip()
                 if "ADC" in fu and pu not in c5_adc_pins:
                     blocking_errors.append(
                         f"{p} ({func}): En XIAO ESP32-C5 / ESP32-C5 solo D0 (GPIO1 = ADC1_CH0) en el borde o GPIO1..GPIO6 poseen ADC1. D2 es GPIO25 (NO tiene ADC y es Strapping Pin)."
@@ -465,10 +569,13 @@ def validate_mcu_pinout(
                     blocking_errors.append(
                         f"{p} ({func}): En XIAO ESP32-C5 Seeed Studio prohíbe usar los pads JTAG inferiores (MTMS=GPIO2/Strapping, MTDI=GPIO3/Strapping, MTCK, MTDO) para Deep-Sleep Wake o buses periféricos; use D4 (GPIO23 SDA) y D5 (GPIO24 SCL)."
                     )
-                elif pu in c5_strapping:
-                    warnings.append(
-                        f"Strapping Pin {pu} en ESP32-C5 asignado a '{func}': asegure que no fuerce niveles inválidos durante el reset."
-                    )
+
+        # Alerta anti Back-Powering en diseños ULP con módem conmutado (SIM7080G / LTE)
+        all_funcs = " ".join(pin_assignments.values()).upper()
+        if ("LTE_EN" in all_funcs or "MODEM_EN" in all_funcs) and ("TX" in all_funcs or "RX" in all_funcs):
+            recommendations.append(
+                "CRÍTICO ULP (Anti Back-Powering): Al cortar VBAT_LTE con MOSFET P (Q7), ponga TX/RX/PWRKEY en LOW o Hi-Z (o use TXS0102 con VCCA ligado al módem) antes de apagar, para evitar alimentar parasitariamente el módem por sus diodos ESD."
+            )
 
         recommendations.append("Incluya red RC de retardo en pin EN/CHIP_PU (10 kΩ a 3V3 + 1 uF a GND) y fuente 3.3V >= 600 mA.")
 
@@ -500,6 +607,7 @@ def validate_mcu_pinout(
         "passed": len(blocking_errors) == 0,
         "blocking_errors": blocking_errors,
         "warnings": warnings,
+        "safe_clean_pins": safe_clean_pins,
         "mandatory_hardware_checks": recommendations,
     }
 
@@ -1209,13 +1317,14 @@ TOOLS_SCHEMA = [
     },
     {
         "name": "pcb_validate_mcu_pinout",
-        "description": "Valida asignaciones de pines de microcontroladores (ESP32, ESP32-S3, ESP32-C3, XIAO-ESP32-C6, STM32, RP2040, ATmega328P) contra pines trampa de arranque (Strapping), bloqueo de ADC2 con Wi-Fi, pines LP-IO de Deep Sleep y cortocircuitos en AREF.",
+        "description": "Valida asignaciones de pines de microcontroladores (ESP32 clásico, ESP32-S3, ESP32-C3, ESP32-C5, XIAO-ESP32-C5/C6, DPTechnics Walter, STM32, RP2040, ATmega328P) aplicando la Matriz de 3 Niveles: bloquea pines PROHIBIDOS (SPI Flash/PSRAM interna, Input-Only como salida, módem interno Walter), advierte pines SENSIBLES (USB nativo D-/D+, Strapping pins de arranque, JTAG, bloqueo ADC2 con Wi-Fi, back-powering por UART) y entrega la lista de pines limpios y seguros.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "mcu_family": {"type": "string", "description": "Ej. 'ESP32', 'ESP32-S3', 'ESP32-C3', 'XIAO-ESP32-C6', 'STM32G0', 'RP2040', 'ATmega328P'."},
+                "mcu_family": {"type": "string", "description": "Ej. 'ESP32', 'ESP32-S3', 'ESP32-C3', 'ESP32-C5', 'XIAO-ESP32-C5', 'XIAO-ESP32-C6', 'WALTER-ESP32-S3', 'STM32G0', 'RP2040', 'ATmega328P'."},
                 "pin_assignments": {"type": "object", "description": "Diccionario { 'GPIO0': 'Sensor_In', 'GPIO12': 'Relay_Out', ... }."},
                 "uses_wifi": {"type": "boolean", "default": True},
+                "octal_flash_psram": {"type": "boolean", "default": False, "description": "True si el ESP32-S3 usa memoria Octal Flash/PSRAM (bloquea GPIO33..37)."},
             },
             "required": ["mcu_family", "pin_assignments"],
         },
@@ -1352,7 +1461,7 @@ def run_stdio_server() -> None:
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "agent-design-pcb-mcp",
-                        "version": "4.5.0",
+                        "version": "4.6.0",
                     },
                 },
             }
